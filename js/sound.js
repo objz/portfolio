@@ -1,11 +1,11 @@
 export class SoundManager {
   constructor() {
     this.sounds = {
-      boot: new Audio("../audio/boot.wav"),
-      intro: new Audio("../audio/intro.wav"),
-      loop: new Audio("../audio/loop.wav"),
-      fan: new Audio("../audio/fan.wav"),
-      click: new Audio("../audio/click.wav"),
+      boot: new Audio("audio/boot.wav"),
+      intro: new Audio("audio/intro.wav"),
+      loop: new Audio("audio/loop.wav"),
+      fan: new Audio("audio/fan.wav"),
+      click: new Audio("audio/click.wav"),
     };
 
     this.keySounds = [];
@@ -60,7 +60,7 @@ export class SoundManager {
       const keyInstances = [];
 
       for (let i = 0; i < this.poolSize; i++) {
-        const audio = new Audio(`../audio/keys/key${keyNumber}.wav`);
+        const audio = new Audio(`audio/keys/key${keyNumber}.wav`);
         keyInstances.push(audio);
       }
 
