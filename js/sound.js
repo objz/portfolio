@@ -1,11 +1,18 @@
+function getBasePath() {
+  let path = window.location.pathname;
+  if (!path.endsWith("/")) path = path.substring(0, path.lastIndexOf("/") + 1);
+  return path;
+}
+const BASE_PATH = getBasePath();
+
 export class SoundManager {
   constructor() {
     this.sounds = {
-      boot: new Audio("audio/boot.wav"),
-      intro: new Audio("audio/intro.wav"),
-      loop: new Audio("audio/loop.wav"),
-      fan: new Audio("audio/fan.wav"),
-      click: new Audio("audio/click.wav"),
+      boot: new Audio(`${BASE_PATH}audio/boot.wav`),
+      intro: new Audio(`${BASE_PATH}audio/intro.wav`),
+      loop: new Audio(`${BASE_PATH}audio/loop.wav`),
+      fan: new Audio(`${BASE_PATH}audio/fan.wav`),
+      click: new Audio(`${BASE_PATH}audio/click.wav`),
     };
 
     this.keySounds = [];
@@ -60,7 +67,7 @@ export class SoundManager {
       const keyInstances = [];
 
       for (let i = 0; i < this.poolSize; i++) {
-        const audio = new Audio(`audio/keys/key${keyNumber}.wav`);
+        const audio = new Audio(`${BASE_PATH}audio/keys/key${keyNumber}.wav`);
         keyInstances.push(audio);
       }
 
@@ -105,7 +112,7 @@ export class SoundManager {
 
     for (let i = 1; i <= 17; i++) {
       try {
-        const response = await fetch(`audio/keys/key${i}.wav`, {
+        const response = await fetch(`${BASE_PATH}audio/keys/key${i}.wav`, {
           method: "HEAD",
         });
         if (response.ok) {
