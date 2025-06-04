@@ -15,16 +15,8 @@ jobs:
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Build WASM
-        run: |
-          wasm-pack build --target web --out-dir pkg
-
-      - name: Prepare static site
-        run: |
-          mkdir -p dist/js
-          cp -r static/* dist/
-          cp -r js/* dist/js/
-          cp -r pkg dist/
+      - name: Build static site
+        run: bash ./build.sh
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
