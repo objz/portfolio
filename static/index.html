@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>objz@portfolio:~$ _</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="loading">
+      <div class="loading-text">Initializing...</div>
+      <div class="desktop-notice">Best experienced on desktop</div>
+      <div class="loading-bar" data-text="LOADING...">
+        <div class="loading-progress" id="loading-progress"></div>
+      </div>
+      <button id="start-button" class="start-button hidden">START</button>
+    </div>
+
+    <div id="scene-container"></div>
+
+    <canvas tabindex="0" id="terminal"></canvas>
+    <input
+      id="hidden-input"
+      type="text"
+      style="
+        position: absolute;
+        left: -9999px;
+        top: -9999px;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      "
+      autocomplete="off"
+      spellcheck="false"
+    />
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module" src="../js/index.js"></script>
+  </body>
+</html>
