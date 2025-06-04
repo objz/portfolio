@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: deploy
 
 on:
   push:
@@ -15,10 +15,13 @@ jobs:
         run: |
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Build static site
+      - name: chmod build.sh
+        run: chmod +x ./build.sh
+
+      - name: build static site
         run: ./build.sh
 
-      - name: Deploy to GitHub Pages
+      - name: deploy site
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
