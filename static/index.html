@@ -9,7 +9,7 @@
   <body>
     <div id="loading">
       <div class="loading-text">Initializing...</div>
-      <div class="desktop-notice">Best experienced on desktop</div>
+      <div class="desktop-notice">Best experience on desktop</div>
       <div class="loading-bar" data-text="LOADING...">
         <div class="loading-progress" id="loading-progress"></div>
       </div>
@@ -17,6 +17,20 @@
     </div>
 
     <div id="scene-container"></div>
+
+    <div id="minimal-overlay">
+      <div id="top-bar">
+        <button id="mute-btn" title="Toggle Ambient Music">
+          <span id="audio-icon">♪</span>
+        </button>
+        <a href="https://github.com/objz" target="_blank" id="portfolio-title">
+          <span id="typed-text"></span>
+          <span id="cursor">_</span>
+        </a>
+      </div>
+
+      <div id="instructions">click screen to interact</div>
+    </div>
 
     <canvas tabindex="0" id="terminal"></canvas>
     <input

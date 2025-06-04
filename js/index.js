@@ -1,7 +1,25 @@
 import init from "../pkg/portfolio.js";
 import { Terminal3D } from "./terminal3d.js";
+import { soundManager } from "./sound.js";
 
 let isWebsiteStarted = false;
+let isMuted = false;
+let typingInterval;
+
+function typeText() {
+  const text = "objz@portfolio";
+  const typedElement = document.getElementById("typed-text");
+  let i = 0;
+
+  typingInterval = setInterval(() => {
+    if (i < text.length) {
+      typedElement.textContent += text.charAt(i);
+      i++;
+    } else {
+      clearInterval(typingInterval);
+    }
+  }, 100);
+}
 
 function simulateLoading() {
   const progressBar = document.getElementById("loading-progress");
@@ -32,8 +50,14 @@ function startWebsite() {
   isWebsiteStarted = true;
 
   const loading = document.getElementById("loading");
+  const minimalOverlay = document.getElementById("minimal-overlay");
 
   loading.classList.add("hidden");
+
+  setTimeout(() => {
+    minimalOverlay.classList.add("visible");
+    typeText();
+  }, 1000);
 
   if (window.terminal3d) {
     window.terminal3d.startIntroSequence();
@@ -42,6 +66,29 @@ function startWebsite() {
   setTimeout(() => {
     loading.style.display = "none";
   }, 500);
+}
+
+function toggleMute() {
+  const muteButton = document.getElementById("mute-btn");
+  const audioIcon = document.getElementById("audio-icon");
+
+  isMuted = !isMuted;
+
+  if (isMuted) {
+    soundManager.sounds.intro.volume = 0;
+    soundManager.sounds.loop.volume = 0;
+
+    muteButton.classList.add("muted");
+    audioIcon.textContent = "♪̸";
+    muteButton.title = "Unmute Ambient Music";
+  } else {
+    soundManager.sounds.intro.volume = soundManager.ambientVolume;
+    soundManager.sounds.loop.volume = soundManager.ambientVolume;
+
+    muteButton.classList.remove("muted");
+    audioIcon.textContent = "♪";
+    muteButton.title = "Mute Ambient Music";
+  }
 }
 
 init().then(() => {
@@ -76,10 +123,12 @@ init().then(() => {
 
 document.addEventListener("DOMContentLoaded", () => {
   const startButton = document.getElementById("start-button");
+  const muteBtn = document.getElementById("mute-btn");
 
   simulateLoading();
 
   startButton.addEventListener("click", startWebsite);
+  muteBtn.addEventListener("click", toggleMute);
 
   document.addEventListener("keydown", (event) => {
     if (
@@ -98,6 +147,11 @@ document.addEventListener("DOMContentLoaded", () => {
       event.preventDefault();
       window.toggleDebug();
     }
+
+    if (isWebsiteStarted && event.key.toLowerCase() === "m") {
+      event.preventDefault();
+      toggleMute();
+    }
   });
 
   window.toggleDebug = () => {
@@ -114,6 +168,9 @@ document.addEventListener("terminalReady", (event) => {
 window.addEventListener("beforeunload", () => {
   if (window.terminal3d) {
     window.terminal3d.dispose();
+  }
+  if (typingInterval) {
+    clearInterval(typingInterval);
   }
 });
 
