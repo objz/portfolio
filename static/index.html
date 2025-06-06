@@ -7,44 +7,41 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="loading">
+    <div id="loading" class="loading">
       <div class="loading-text">Initializing...</div>
       <div class="desktop-notice">Best experience on desktop</div>
       <div class="loading-bar" data-text="LOADING...">
         <div class="loading-progress" id="loading-progress"></div>
       </div>
-      <button id="start-button" class="start-button hidden">START</button>
+      <button id="start-btn" class="start-button hidden">START</button>
     </div>
 
-    <div id="scene-container"></div>
+    <div id="scene-container" class="scene-container"></div>
 
-    <div id="minimal-overlay">
-      <div id="top-bar">
-        <button id="mute-btn" title="Toggle Ambient Music">
-          <span id="audio-icon">♪</span>
+    <div id="overlay" class="overlay">
+      <div id="top-bar" class="top-bar">
+        <button id="audio-btn" class="audio-btn" title="Toggle Ambient Music">
+          <span id="audio-icon" class="audio-icon">♪</span>
         </button>
-        <a href="https://github.com/objz" target="_blank" id="portfolio-title">
-          <span id="typed-text"></span>
-          <span id="cursor">_</span>
+        <a
+          href="https://github.com/objz"
+          target="_blank"
+          id="portfolio-title"
+          class="portfolio-title"
+        >
+          <span id="typed-text" class="typed-text"></span>
+          <span id="cursor" class="cursor">_</span>
         </a>
       </div>
 
-      <div id="instructions">click screen to interact</div>
+      <div id="instructions" class="instructions">click screen to interact</div>
     </div>
 
-    <canvas tabindex="0" id="terminal"></canvas>
+    <canvas tabindex="0" id="terminal" class="terminal"></canvas>
     <input
       id="hidden-input"
+      class="hidden-input"
       type="text"
-      style="
-        position: absolute;
-        left: -9999px;
-        top: -9999px;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
-        pointer-events: none;
-      "
       autocomplete="off"
       spellcheck="false"
     />

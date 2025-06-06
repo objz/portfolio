@@ -9,11 +9,11 @@ export class AppManager {
     this.typingInterval = null;
 
     this.startButton = null;
-    this.muteButton = null;
+    this.audioButton = null;
     this.audioIcon = null;
     this.typedElement = null;
     this.loading = null;
-    this.minimalOverlay = null;
+    this.overlay = null;
 
     this.init_self();
   }
@@ -36,12 +36,12 @@ export class AppManager {
   }
 
   initElements() {
-    this.startButton = document.getElementById("start-button");
-    this.muteButton = document.getElementById("mute-btn");
+    this.startButton = document.getElementById("start-btn");
+    this.audioButton = document.getElementById("audio-btn");
     this.audioIcon = document.getElementById("audio-icon");
     this.typedElement = document.getElementById("typed-text");
     this.loading = document.getElementById("loading");
-    this.minimalOverlay = document.getElementById("minimal-overlay");
+    this.overlay = document.getElementById("overlay");
   }
 
   initEventListeners() {
@@ -49,8 +49,8 @@ export class AppManager {
       this.startButton.addEventListener("click", () => this.startWebsite());
     }
 
-    if (this.muteButton) {
-      this.muteButton.addEventListener("click", () => this.toggleMute());
+    if (this.audioButton) {
+      this.audioButton.addEventListener("click", () => this.toggleMute());
     }
 
     window.addEventListener("beforeunload", () => this.dispose());
@@ -91,8 +91,8 @@ export class AppManager {
 
   showTerminalOverlay() {
     setTimeout(() => {
-      if (this.minimalOverlay) {
-        this.minimalOverlay.classList.add("visible");
+      if (this.overlay) {
+        this.overlay.classList.add("visible");
         this.typeText();
       }
     }, 1000);
@@ -156,16 +156,16 @@ export class AppManager {
   }
 
   updateMuteButton() {
-    if (!this.muteButton || !this.audioIcon) return;
+    if (!this.audioButton || !this.audioIcon) return;
 
     if (this.isMuted) {
-      this.muteButton.classList.add("muted");
+      this.audioButton.classList.add("muted");
       this.audioIcon.textContent = "♪̸";
-      this.muteButton.title = "Unmute Ambient Music";
+      this.audioButton.title = "Unmute Ambient Music";
     } else {
-      this.muteButton.classList.remove("muted");
+      this.audioButton.classList.remove("muted");
       this.audioIcon.textContent = "♪";
-      this.muteButton.title = "Mute Ambient Music";
+      this.audioButton.title = "Mute Ambient Music";
     }
   }
 

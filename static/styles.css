@@ -5,28 +5,27 @@
 }
 
 body {
-  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-  color: #e6e6e6;
+  background: #0a0a0a;
   font-family:
     "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", monospace;
   overflow: hidden;
 }
 
-#scene-container {
+.scene-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
   z-index: 10;
-  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0a 70%);
+  background: #0a0a0a;
   opacity: 0;
   visibility: hidden;
-  animation: sceneAppear 1s ease-out forwards;
+  animation: scene-appear 1s ease-out forwards;
   animation-play-state: paused;
 }
 
-@keyframes sceneAppear {
+@keyframes scene-appear {
   0% {
     opacity: 0;
     visibility: hidden;
@@ -40,7 +39,7 @@ body {
   }
 }
 
-#minimal-overlay {
+.overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -53,11 +52,11 @@ body {
   font-family: "JetBrains Mono", monospace;
 }
 
-#minimal-overlay.visible {
+.overlay.visible {
   opacity: 1;
 }
 
-#top-bar {
+.top-bar {
   position: absolute;
   top: 24px;
   left: 24px;
@@ -67,7 +66,7 @@ body {
   pointer-events: auto;
 }
 
-#portfolio-title {
+.portfolio-title {
   color: #888888;
   font-size: 14px;
   font-weight: 400;
@@ -78,18 +77,17 @@ body {
   align-items: center;
 }
 
-#portfolio-title:hover {
+.portfolio-title:hover {
   color: #8be9fd;
   text-shadow: 0 0 8px rgba(139, 233, 253, 0.4);
 }
 
-#cursor {
+.cursor {
   opacity: 1;
-  animation: blink 1s infinite;
-  color: #8be9fd;
+  animation: cursor-blink 1s infinite;
 }
 
-@keyframes blink {
+@keyframes cursor-blink {
   0%,
   50% {
     opacity: 1;
@@ -100,7 +98,7 @@ body {
   }
 }
 
-#instructions {
+.instructions {
   position: absolute;
   bottom: 24px;
   left: 24px;
@@ -112,9 +110,9 @@ body {
   text-shadow: 0 0 1px rgba(119, 119, 119, 0.5);
 }
 
-#mute-btn {
+.audio-btn {
   border: none;
-  color: #8be9fd;
+  color: #888888;
   font-size: 14px;
   cursor: pointer;
   padding: 8px 2px;
@@ -124,63 +122,63 @@ body {
   background: transparent;
 }
 
-#mute-btn:hover {
+.audio-btn:hover {
   color: #ffffff;
 }
 
-#mute-btn.muted {
+.audio-btn.muted {
   color: #ff6464;
   text-decoration: line-through;
 }
 
-#mute-btn.muted:hover {
+.audio-btn.muted:hover {
   color: #ffffff;
 }
 
 @media (max-width: 768px) {
-  #top-bar {
+  .top-bar {
     top: 16px;
     left: 16px;
     gap: 12px;
   }
 
-  #portfolio-title {
+  .portfolio-title {
     font-size: 12px;
   }
 
-  #instructions {
+  .instructions {
     bottom: 16px;
     left: 16px;
     font-size: 10px;
   }
 
-  #mute-btn {
+  .audio-btn {
     font-size: 12px;
     padding: 6px 10px;
   }
 }
 
 @media (max-width: 480px) {
-  #instructions {
+  .instructions {
     font-size: 9px;
   }
 
-  #portfolio-title {
+  .portfolio-title {
     font-size: 11px;
   }
 
-  #mute-btn {
+  .audio-btn {
     font-size: 11px;
     padding: 5px 8px;
   }
 }
 
-#loading:not(.hidden) ~ * #minimal-overlay {
+.loading:not(.hidden) ~ * .overlay {
   opacity: 0;
   pointer-events: none;
 }
 
-#loading {
+.loading {
   position: fixed;
   top: 0;
   left: 0;
@@ -206,7 +204,7 @@ body {
   backdrop-filter: blur(10px);
 }
 
-#loading::before {
+.loading::before {
   content: "";
   position: absolute;
   top: 0;
@@ -220,11 +218,11 @@ body {
     rgba(255, 255, 255, 0.03) 2px,
     rgba(255, 255, 255, 0.03) 4px
   );
-  animation: scanlines 0.1s linear infinite;
+  animation: loading-scanlines 0.1s linear infinite;
   pointer-events: none;
 }
 
-#loading::after {
+.loading::after {
   content: "";
   position: absolute;
   top: 0;
@@ -236,11 +234,11 @@ body {
     transparent 30%,
     rgba(0, 0, 0, 0.4) 100%
   );
-  animation: crtFlicker 4s ease-in-out infinite;
+  animation: loading-flicker 4s ease-in-out infinite;
   pointer-events: none;
 }
 
-@keyframes scanlines {
+@keyframes loading-scanlines {
   0% {
     transform: translateY(0);
   }
@@ -249,7 +247,7 @@ body {
   }
 }
 
-@keyframes crtFlicker {
+@keyframes loading-flicker {
   0%,
   96%,
   100% {
@@ -266,7 +264,7 @@ body {
   }
 }
 
-#loading.hidden {
+.loading.hidden {
   opacity: 0;
   pointer-events: none;
 }
@@ -278,8 +276,8 @@ body {
     0 0 10px rgba(255, 255, 255, 0.6),
     0 0 15px rgba(255, 255, 255, 0.4);
   animation:
-    crtGlow 2s infinite ease-in-out,
-    textFlicker 0.15s infinite linear;
+    text-glow 2s infinite ease-in-out,
+    text-flicker 0.15s infinite linear;
   margin-bottom: 1rem;
   position: relative;
   font-weight: 500;
@@ -290,7 +288,7 @@ body {
 .loading-text::before {
   content: "> ";
   color: #cccccc;
-  animation: cursorBlink 1s infinite;
+  animation: text-cursor-blink 1s infinite;
 }
 
 .loading-text::after {
@@ -306,7 +304,7 @@ body {
     rgba(255, 255, 255, 0.1) 50%,
     transparent 100%
   );
-  animation: textScan 3s infinite;
+  animation: text-scan 3s infinite;
 }
 
 .desktop-notice {
@@ -324,7 +322,7 @@ body {
   color: #ffffff;
 }
 
-@keyframes fadeInGlow {
+@keyframes notice-fade-in {
   0% {
     opacity: 0;
     transform: translateY(10px);
@@ -335,7 +333,7 @@ body {
   }
 }
 
-@keyframes crtGlow {
+@keyframes text-glow {
   0%,
   100% {
     text-shadow:
@@ -353,7 +351,7 @@ body {
   }
 }
 
-@keyframes textFlicker {
+@keyframes text-flicker {
   0%,
   98%,
   100% {
@@ -364,7 +362,7 @@ body {
   }
 }
 
-@keyframes cursorBlink {
+@keyframes text-cursor-blink {
   0%,
   50% {
     opacity: 1;
@@ -375,7 +373,7 @@ body {
   }
 }
 
-@keyframes textScan {
+@keyframes text-scan {
   0%,
   100% {
     transform: translateX(-100%);
@@ -416,7 +414,7 @@ body {
     rgba(255, 255, 255, 0.05) 1px,
     rgba(255, 255, 255, 0.05) 2px
   );
-  animation: barScanlines 0.1s linear infinite;
+  animation: bar-scanlines 0.1s linear infinite;
   z-index: 1;
 }
 
@@ -435,7 +433,7 @@ body {
   font-weight: bold;
 }
 
-@keyframes barScanlines {
+@keyframes bar-scanlines {
   0% {
     transform: translateX(0);
   }
@@ -453,8 +451,8 @@ body {
     0 0 10px rgba(255, 255, 255, 0.8),
     inset 0 0 10px rgba(255, 255, 255, 0.2);
   animation:
-    progressFlicker 0.2s infinite linear,
-    progressGlow 2s infinite ease-in-out;
+    progress-flicker 0.2s infinite linear,
+    progress-glow 2s infinite ease-in-out;
   position: relative;
   z-index: 2;
 }
@@ -473,10 +471,10 @@ body {
     rgba(255, 255, 255, 0.2) 2px,
     rgba(255, 255, 255, 0.2) 4px
   );
-  animation: progressPattern 1s linear infinite;
+  animation: progress-pattern 1s linear infinite;
 }
 
-@keyframes progressFlicker {
+@keyframes progress-flicker {
   0%,
   95%,
   100% {
@@ -496,7 +494,7 @@ body {
   }
 }
 
-@keyframes progressGlow {
+@keyframes progress-glow {
   0%,
   100% {
     box-shadow:
@@ -510,7 +508,7 @@ body {
   }
 }
 
-@keyframes progressPattern {
+@keyframes progress-pattern {
   0% {
     transform: translateX(-8px);
   }
@@ -541,7 +539,7 @@ body {
     0 0 5px rgba(255, 255, 255, 0.8),
     0 0 10px rgba(255, 255, 255, 0.6),
     0 0 15px rgba(255, 255, 255, 0.4);
-  animation: buttonGlow 2s infinite ease-in-out;
+  animation: button-glow 2s infinite ease-in-out;
   z-index: 2;
 }
 
@@ -559,7 +557,7 @@ body {
     rgba(255, 255, 255, 0.05) 1px,
     rgba(255, 255, 255, 0.05) 2px
   );
-  animation: buttonScanlines 0.1s linear infinite;
+  animation: button-scanlines 0.1s linear infinite;
 }
 
 .start-button::after {
@@ -608,10 +606,10 @@ body {
 .start-button.visible {
   opacity: 1;
   transform: translateY(0);
-  animation: buttonAppear 1s ease-out forwards;
+  animation: button-appear 1s ease-out forwards;
 }
 
-@keyframes buttonGlow {
+@keyframes button-glow {
   0%,
   100% {
     box-shadow:
@@ -625,7 +623,7 @@ body {
   }
 }
 
-@keyframes buttonScanlines {
+@keyframes button-scanlines {
   0% {
     transform: translateX(0);
   }
@@ -634,7 +632,7 @@ body {
   }
 }
 
-@keyframes buttonAppear {
+@keyframes button-appear {
   0% {
     opacity: 0;
     transform: translateY(20px) scale(0.9);
@@ -647,7 +645,7 @@ body {
   }
 }
 
-#terminal {
+.terminal {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -667,11 +665,11 @@ body {
   image-rendering: crisp-edges;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0;
-  animation: terminalAppear 1.5s ease-out forwards;
+  animation: terminal-appear 1.5s ease-out forwards;
   animation-play-state: paused;
 }
 
-@keyframes terminalAppear {
+@keyframes terminal-appear {
   0% {
     opacity: 0;
     transform: translate(-50%, -50%) scale(0.9);
@@ -684,17 +682,17 @@ body {
   }
 }
 
-#terminal:focus {
+.terminal:focus {
   box-shadow:
     0 0 30px rgba(139, 233, 253, 0.7),
     0 0 60px rgba(139, 233, 253, 0.5),
     0 0 90px rgba(139, 233, 253, 0.3),
     0 0 120px rgba(139, 233, 253, 0.1);
   transform: translate(-50%, -50%) scale(1.02);
-  animation: terminalPulse 2s infinite ease-in-out;
+  animation: terminal-pulse 2s infinite ease-in-out;
 }
 
-@keyframes terminalPulse {
+@keyframes terminal-pulse {
   0%,
   100% {
     box-shadow:
@@ -710,7 +708,7 @@ body {
   }
 }
 
-#terminal:hover {
+.terminal:hover {
   box-shadow:
     0 0 35px rgba(139, 233, 253, 0.5),
     0 0 70px rgba(139, 233, 253, 0.4),
@@ -718,7 +716,7 @@ body {
   transform: translate(-50%, -50%) scale(1.01);
 }
 
-#terminal.texture-mode {
+.terminal.texture-mode {
   visibility: hidden;
   position: fixed;
   top: -9999px;
@@ -727,20 +725,20 @@ body {
   opacity: 1;
 }
 
-#scene-container canvas {
+.scene-container canvas {
   cursor: default;
   transition: cursor 0.3s ease;
 }
 
-#scene-container canvas:hover {
+.scene-container canvas:hover {
   cursor: grab;
 }
 
-#scene-container canvas:active {
+.scene-container canvas:active {
   cursor: grabbing;
 }
 
-#scene-container canvas.screen-hover {
+.scene-container canvas.screen-hover {
   cursor: pointer !important;
 }
 
@@ -748,15 +746,15 @@ body {
   pointer-events: none;
 }
 
-.camera-focused #terminal {
+.camera-focused .terminal {
   box-shadow:
     0 0 40px rgba(139, 233, 253, 0.8),
     0 0 80px rgba(139, 233, 253, 0.6),
     0 0 120px rgba(139, 233, 253, 0.4) !important;
-  animation: terminalFocusedGlow 1.5s infinite ease-in-out;
+  animation: terminal-focused-glow 1.5s infinite ease-in-out;
 }
 
-@keyframes terminalFocusedGlow {
+@keyframes terminal-focused-glow {
   0%,
   100% {
     filter: brightness(1) contrast(1);
@@ -766,8 +764,24 @@ body {
   }
 }
 
+.typed-text {
+}
+
+.audio-icon {
+}
+
+.hidden-input {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 @media (max-width: 1024px) {
-  #terminal {
+  .terminal {
     width: 90vw;
     height: 70vh;
     max-width: 800px;
@@ -789,7 +803,7 @@ body {
 }
 
 @media (max-width: 768px) {
-  #terminal {
+  .terminal {
     width: 95vw;
     height: 75vh;
     font-size: 14px;
@@ -832,7 +846,7 @@ body {
 }
 
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  #terminal {
+  .terminal {
     image-rendering: auto;
   }
 }
@@ -841,20 +855,20 @@ body {
   .loading-text,
   .loading-progress,
   .start-button,
-  #terminal,
-  #scene-container,
-  #minimal-overlay {
+  .terminal,
+  .scene-container,
+  .overlay {
     animation: none !important;
     transition: opacity 0.3s ease !important;
   }
-  #loading {
+  .loading {
     transition: opacity 0.5s ease !important;
   }
 }
 
-#scene-container,
-#terminal,
-#loading,
+.scene-container,
+.terminal,
+.loading,
 .start-button {
   will-change: transform, opacity;
 }

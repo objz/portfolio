@@ -346,7 +346,7 @@ export class SceneManager {
   }
 
   showStartButton() {
-    const startButton = document.getElementById("start-button");
+    const startButton = document.getElementById("start-btn");
     startButton.classList.remove("hidden");
     startButton.classList.add("visible");
   }
