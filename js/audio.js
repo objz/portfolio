@@ -3,9 +3,10 @@ function getBasePath() {
   if (!path.endsWith("/")) path = path.substring(0, path.lastIndexOf("/") + 1);
   return path;
 }
+
 const BASE_PATH = getBasePath();
 
-export class SoundManager {
+export class AudioManager {
   constructor() {
     this.sounds = {
       boot: new Audio(`${BASE_PATH}audio/boot.wav`),
@@ -22,27 +23,27 @@ export class SoundManager {
     this.sounds.fan.loop = true;
     this.sounds.loop.loop = true;
     this.ambientStarted = false;
-    this.clickSoundEnabled = true;
-    this.keySoundEnabled = true;
+    this.clickEnabled = true;
+    this.keyEnabled = true;
     this.soundsLoaded = false;
-    this.isInitialized = false;
+    this.initialized = false;
 
     this.ambientVolume = 0.25;
     this.mainVolume = 0.4;
   }
 
   async init() {
-    if (this.isInitialized) return;
+    if (this.initialized) return;
 
-    await this.preloadAllSounds();
+    await this.preloadSounds();
     this.setVolume(this.mainVolume);
     this.setupClickListener();
-    this.setupKeyboardListener();
-    this.isInitialized = true;
+    this.setupKeyListener();
+    this.initialized = true;
   }
 
-  async preloadAllSounds() {
-    const mainSoundPromises = Object.values(this.sounds).map((audio) => {
+  async preloadSounds() {
+    const mainPromises = Object.values(this.sounds).map((audio) => {
       return new Promise((resolve) => {
         if (audio.readyState >= 2) {
           resolve();
@@ -61,9 +62,9 @@ export class SoundManager {
       });
     });
 
-    const existingKeyFiles = await this.checkExistingKeyFiles();
+    const existingKeys = await this.checkKeyFiles();
 
-    for (const keyNumber of existingKeyFiles) {
+    for (const keyNumber of existingKeys) {
       const keyInstances = [];
 
       for (let i = 0; i < this.poolSize; i++) {
@@ -78,7 +79,7 @@ export class SoundManager {
       });
     }
 
-    const keySoundPromises = this.keySoundPool.flatMap((pool) =>
+    const keyPromises = this.keySoundPool.flatMap((pool) =>
       pool.instances.map((audio) => {
         return new Promise((resolve) => {
           if (audio.readyState >= 2) {
@@ -99,15 +100,15 @@ export class SoundManager {
       }),
     );
 
-    await Promise.all([...mainSoundPromises, ...keySoundPromises]);
+    await Promise.all([...mainPromises, ...keyPromises]);
 
     this.soundsLoaded = true;
     console.log(
-      `All sounds preloaded! (${this.keySoundPool.length} key sound types with ${this.poolSize} instances each)`,
+      `Sounds loaded! (${this.keySoundPool.length} key types with ${this.poolSize} instances each)`,
     );
   }
 
-  async checkExistingKeyFiles() {
+  async checkKeyFiles() {
     const existingFiles = [];
 
     for (let i = 1; i <= 17; i++) {
@@ -152,7 +153,7 @@ export class SoundManager {
 
     document.addEventListener("mouseup", (event) => {
       if (
-        this.clickSoundEnabled &&
+        this.clickEnabled &&
         this.mouseDownTime &&
         (event.button === 0 || event.button === 2)
       ) {
@@ -171,15 +172,15 @@ export class SoundManager {
     });
   }
 
-  setupKeyboardListener() {
+  setupKeyListener() {
     document.addEventListener("keydown", (_event) => {
-      if (this.keySoundEnabled && this.soundsLoaded) {
-        this.playRandomKeySound();
+      if (this.keyEnabled && this.soundsLoaded) {
+        this.playRandomKey();
       }
     });
   }
 
-  playRandomKeySound() {
+  playRandomKey() {
     if (this.keySoundPool.length === 0) return;
 
     const randomPoolIndex = Math.floor(
@@ -218,12 +219,13 @@ export class SoundManager {
   }
 
   play(name) {
-    if (!this.isInitialized) {
-      console.warn(`SoundManager not initialized, cannot play: ${name}`);
+    if (!this.initialized) {
+      console.warn(`Audio not initialized, cannot play: ${name}`);
       return;
     }
 
     if (!this.sounds[name]) return;
+
     if (name === "ambient") {
       this.playAmbient();
     } else if (name === "boot") {
@@ -268,8 +270,6 @@ export class SoundManager {
 
     this.keySoundPool = [];
     this.soundsLoaded = false;
-    this.isInitialized = false;
+    this.initialized = false;
   }
 }
-
-export const soundManager = new SoundManager();

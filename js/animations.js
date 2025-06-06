@@ -1,10 +1,10 @@
 import * as THREE from "three";
 
 export class AnimationManager {
-  constructor(camera, controls, onStateChange) {
+  constructor(camera, controls, performanceMode) {
     this.camera = camera;
     this.controls = controls;
-    this.onStateChange = onStateChange;
+    this.performanceMode = performanceMode;
 
     this.startupPhase = "waiting";
     this.cameraStates = {
@@ -26,11 +26,11 @@ export class AnimationManager {
       },
     };
 
-    this.currentCameraState = "default";
-    this.isAnimatingCamera = false;
+    this.currentState = "default";
+    this.animatingCamera = false;
     this.idleRotationActive = false;
     this.lastInteractionTime = Date.now();
-    this.lastFocusedInteractionTime = Date.now();
+    this.lastFocusedTime = Date.now();
     this.inactivityDelay = 10000;
     this.focusedInactivityDelay = 180000;
     this.idleRotationSpeed = 0.0002;
@@ -44,39 +44,11 @@ export class AnimationManager {
       position: { x: [-15, 15], y: [2, 12], z: [3, 20] },
       target: { x: [-5, 5], y: [0, 5], z: [-3, 3] },
     };
-    this.lastValidCameraPosition = new THREE.Vector3();
-    this.lastValidCameraTarget = new THREE.Vector3();
+    this.lastValidPosition = new THREE.Vector3();
+    this.lastValidTarget = new THREE.Vector3();
 
-    this.performanceMode = this.detectPerformanceMode();
     this.animationFrameSkip = this.performanceMode ? 2 : 1;
     this.frameCounter = 0;
-  }
-
-  detectPerformanceMode() {
-    const canvas = document.createElement("canvas");
-    const gl =
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-
-    if (!gl) return true;
-
-    const renderer = gl.getParameter(gl.RENDERER);
-
-    const isMobile =
-      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent,
-      );
-
-    const isLowEndGPU = /Intel|Mali|Adreno 3|Adreno 4|PowerVR SGX/i.test(
-      renderer,
-    );
-
-    const memory = navigator.deviceMemory || 4;
-    const isLowMemory = memory < 4;
-
-    const cores = navigator.hardwareConcurrency || 4;
-    const isLowCPU = cores < 4;
-
-    return isMobile || isLowEndGPU || isLowMemory || isLowCPU;
   }
 
   startupAnimation() {
@@ -89,17 +61,17 @@ export class AnimationManager {
       this.animateToState("focused", duration, () => {
         this.startupPhase = "complete";
         this.lastInteractionTime = Date.now();
-        this.lastFocusedInteractionTime = Date.now();
+        this.lastFocusedTime = Date.now();
       });
     }, delay);
   }
 
   animateToState(stateName, duration = 1500, onComplete = null) {
-    if (!this.cameraStates[stateName] || this.isAnimatingCamera) return;
+    if (!this.cameraStates[stateName] || this.animatingCamera) return;
 
-    this.isAnimatingCamera = true;
+    this.animatingCamera = true;
     this.idleRotationActive = false;
-    this.currentCameraState = stateName;
+    this.currentState = stateName;
 
     if (this.performanceMode) {
       duration = Math.max(duration * 0.7, 800);
@@ -140,43 +112,35 @@ export class AnimationManager {
       if (progress < 1) {
         requestAnimationFrame(animateStep);
       } else {
-        this.isAnimatingCamera = false;
+        this.animatingCamera = false;
         if (onComplete) onComplete();
-        if (this.onStateChange) this.onStateChange(stateName);
       }
     };
 
     animateStep();
   }
 
-  updateIdleRotation(isTerminalFocused) {
+  updateIdleRotation(terminalFocused) {
     if (this.startupPhase !== "complete") return;
-    if (this.isAnimatingCamera) return;
+    if (this.animatingCamera) return;
 
     const currentTime = Date.now();
-    const timeSinceLastInteraction = currentTime - this.lastInteractionTime;
-    const timeSinceLastFocusedInteraction =
-      currentTime - this.lastFocusedInteractionTime;
+    const timeSinceInteraction = currentTime - this.lastInteractionTime;
+    const timeSinceFocused = currentTime - this.lastFocusedTime;
 
     const inactivityDelay = this.performanceMode
       ? this.inactivityDelay * 1.5
       : this.inactivityDelay;
-    const focusedInactivityDelay = this.performanceMode
+    const focusedDelay = this.performanceMode
       ? this.focusedInactivityDelay * 1.2
       : this.focusedInactivityDelay;
 
-    if (this.currentCameraState === "focused" && isTerminalFocused) {
-      if (
-        timeSinceLastFocusedInteraction > focusedInactivityDelay &&
-        !this.idleRotationActive
-      ) {
+    if (this.currentState === "focused" && terminalFocused) {
+      if (timeSinceFocused > focusedDelay && !this.idleRotationActive) {
         this.startIdleRotation();
       }
-    } else if (this.currentCameraState !== "focused") {
-      if (
-        timeSinceLastInteraction > inactivityDelay &&
-        !this.idleRotationActive
-      ) {
+    } else if (this.currentState !== "focused") {
+      if (timeSinceInteraction > inactivityDelay && !this.idleRotationActive) {
         this.startIdleRotation();
       }
     }
@@ -205,9 +169,9 @@ export class AnimationManager {
   stopIdleRotation() {
     this.idleRotationActive = false;
     this.lastInteractionTime = Date.now();
-    this.lastFocusedInteractionTime = Date.now();
+    this.lastFocusedTime = Date.now();
 
-    if (this.currentCameraState === "idle") {
+    if (this.currentState === "idle") {
       const duration = this.performanceMode ? 800 : 1000;
       this.animateToState("default", duration);
     }
@@ -215,7 +179,7 @@ export class AnimationManager {
 
   startIdleRotation() {
     this.idleRotationActive = false;
-    this.isAnimatingCamera = true;
+    this.animatingCamera = true;
     this.idleRotationCount = 0;
 
     const startAngle = Math.atan2(
@@ -251,9 +215,9 @@ export class AnimationManager {
       if (progress < 1) {
         requestAnimationFrame(animateToIdleStart);
       } else {
-        this.isAnimatingCamera = false;
+        this.animatingCamera = false;
         this.idleRotationActive = true;
-        this.currentCameraState = "idle";
+        this.currentState = "idle";
       }
     };
 
@@ -269,7 +233,7 @@ export class AnimationManager {
       const timeout = this.performanceMode ? 1500 : 2000;
       setTimeout(() => {
         if (
-          this.currentCameraState === "default" &&
+          this.currentState === "default" &&
           this.startupPhase === "complete"
         ) {
           this.startIdleRotation();
@@ -278,7 +242,7 @@ export class AnimationManager {
     });
   }
 
-  checkAndCorrectCameraBounds() {
+  checkCameraBounds() {
     const pos = this.camera.position;
     const target = this.controls.target;
     let needsCorrection = false;
@@ -305,15 +269,15 @@ export class AnimationManager {
       needsCorrection = true;
     }
 
-    if (needsCorrection && !this.isAnimatingCamera) {
-      this.correctCameraPosition();
+    if (needsCorrection && !this.animatingCamera) {
+      this.correctPosition();
     } else if (!needsCorrection) {
-      this.lastValidCameraPosition.copy(pos);
-      this.lastValidCameraTarget.copy(target);
+      this.lastValidPosition.copy(pos);
+      this.lastValidTarget.copy(target);
     }
   }
 
-  correctCameraPosition() {
+  correctPosition() {
     const duration = this.performanceMode ? 800 : 1000;
     this.animateToState("default", duration);
   }

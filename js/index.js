@@ -1,177 +1,197 @@
 import init from "../pkg/portfolio.js";
-import { Terminal3D } from "./terminal3d.js";
-import { soundManager } from "./sound.js";
+import { SceneManager } from "./scene.js";
 
-let isWebsiteStarted = false;
-let isMuted = false;
-let typingInterval;
+export class AppManager {
+  constructor() {
+    this.sceneManager = null;
+    this.isStarted = false;
+    this.isMuted = false;
+    this.typingInterval = null;
 
-function typeText() {
-  const text = "objz@portfolio";
-  const typedElement = document.getElementById("typed-text");
-  let i = 0;
+    this.startButton = null;
+    this.muteButton = null;
+    this.audioIcon = null;
+    this.typedElement = null;
+    this.loading = null;
+    this.minimalOverlay = null;
 
-  typingInterval = setInterval(() => {
-    if (i < text.length) {
-      typedElement.textContent += text.charAt(i);
-      i++;
-    } else {
-      clearInterval(typingInterval);
+    this.init_self();
+  }
+
+  async init_self() {
+    try {
+      await this.initWasm();
+      this.initElements();
+      this.initEventListeners();
+      this.initScene();
+    } catch (error) {
+      console.error("App initialization failed:", error);
+      this.showError();
     }
-  }, 100);
-}
+  }
 
-function simulateLoading() {
-  const progressBar = document.getElementById("loading-progress");
-  const startButton = document.getElementById("start-button");
-  let progress = 0;
+  async initWasm() {
+    await init();
+    console.log("WASM loaded successfully!");
+  }
 
-  const interval = setInterval(() => {
-    progress += Math.random() * 15;
-    if (progress >= 100) {
-      progress = 100;
-      clearInterval(interval);
+  initElements() {
+    this.startButton = document.getElementById("start-button");
+    this.muteButton = document.getElementById("mute-btn");
+    this.audioIcon = document.getElementById("audio-icon");
+    this.typedElement = document.getElementById("typed-text");
+    this.loading = document.getElementById("loading");
+    this.minimalOverlay = document.getElementById("minimal-overlay");
+  }
 
-      document
-        .querySelector(".loading-bar")
-        .setAttribute("data-text", "READY!");
+  initEventListeners() {
+    if (this.startButton) {
+      this.startButton.addEventListener("click", () => this.startWebsite());
+    }
 
+    if (this.muteButton) {
+      this.muteButton.addEventListener("click", () => this.toggleMute());
+    }
+
+    window.addEventListener("beforeunload", () => this.dispose());
+
+    window.addEventListener("sceneReady", () => {
+      console.log("Scene is ready!");
+    });
+  }
+
+  async initScene() {
+    this.sceneManager = new SceneManager();
+    console.log("3D Scene initialized!");
+  }
+
+  startWebsite() {
+    if (this.isStarted) return;
+    this.isStarted = true;
+
+    console.log("Starting website...");
+
+    this.hideLoading();
+
+    this.showTerminalOverlay();
+
+    this.showScene();
+
+    this.startIntroSequence();
+  }
+
+  hideLoading() {
+    if (this.loading) {
+      this.loading.classList.add("hidden");
       setTimeout(() => {
-        startButton.classList.remove("hidden");
-        startButton.classList.add("visible");
+        this.loading.style.display = "none";
       }, 500);
     }
-    progressBar.style.width = progress + "%";
-  }, 200);
-}
-
-function startWebsite() {
-  if (isWebsiteStarted) return;
-  isWebsiteStarted = true;
-
-  const loading = document.getElementById("loading");
-  const minimalOverlay = document.getElementById("minimal-overlay");
-
-  loading.classList.add("hidden");
-
-  setTimeout(() => {
-    minimalOverlay.classList.add("visible");
-    typeText();
-  }, 1000);
-
-  if (window.terminal3d) {
-    window.terminal3d.startIntroSequence();
   }
 
-  setTimeout(() => {
-    loading.style.display = "none";
-  }, 500);
-}
+  showTerminalOverlay() {
+    setTimeout(() => {
+      if (this.minimalOverlay) {
+        this.minimalOverlay.classList.add("visible");
+        this.typeText();
+      }
+    }, 1000);
+  }
 
-function toggleMute() {
-  const muteButton = document.getElementById("mute-btn");
-  const audioIcon = document.getElementById("audio-icon");
+  showScene() {
+    if (this.sceneManager) {
+      this.sceneManager.showScene();
+    }
+  }
 
-  isMuted = !isMuted;
+  startIntroSequence() {
+    if (this.sceneManager) {
+      this.sceneManager.startIntro();
+    }
+  }
 
-  if (isMuted) {
-    soundManager.sounds.intro.volume = 0;
-    soundManager.sounds.loop.volume = 0;
+  typeText() {
+    const text = "objz@portfolio";
+    if (!this.typedElement) return;
 
-    muteButton.classList.add("muted");
-    audioIcon.textContent = "♪̸";
-    muteButton.title = "Unmute Ambient Music";
-  } else {
-    soundManager.sounds.intro.volume = soundManager.ambientVolume;
-    soundManager.sounds.loop.volume = soundManager.ambientVolume;
+    let i = 0;
+    this.typingInterval = setInterval(() => {
+      if (i < text.length) {
+        this.typedElement.textContent += text.charAt(i);
+        i++;
+      } else {
+        clearInterval(this.typingInterval);
+        this.typingInterval = null;
+      }
+    }, 100);
+  }
 
-    muteButton.classList.remove("muted");
-    audioIcon.textContent = "♪";
-    muteButton.title = "Mute Ambient Music";
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+
+    if (this.sceneManager && this.sceneManager.audioManager) {
+      this.updateAudioState();
+      this.updateMuteButton();
+    }
+  }
+
+  updateAudioState() {
+    const audioManager = this.sceneManager.audioManager;
+
+    if (this.isMuted) {
+      if (audioManager.sounds.intro) {
+        audioManager.sounds.intro.volume = 0;
+      }
+      if (audioManager.sounds.loop) {
+        audioManager.sounds.loop.volume = 0;
+      }
+    } else {
+      if (audioManager.sounds.intro) {
+        audioManager.sounds.intro.volume = audioManager.ambientVolume;
+      }
+      if (audioManager.sounds.loop) {
+        audioManager.sounds.loop.volume = audioManager.ambientVolume;
+      }
+    }
+  }
+
+  updateMuteButton() {
+    if (!this.muteButton || !this.audioIcon) return;
+
+    if (this.isMuted) {
+      this.muteButton.classList.add("muted");
+      this.audioIcon.textContent = "♪̸";
+      this.muteButton.title = "Unmute Ambient Music";
+    } else {
+      this.muteButton.classList.remove("muted");
+      this.audioIcon.textContent = "♪";
+      this.muteButton.title = "Mute Ambient Music";
+    }
+  }
+
+  showError() {
+    const txt = document.querySelector(".loading-text");
+    if (txt) {
+      txt.textContent = "Failed to load application";
+      txt.style.color = "#ff5555";
+    }
+  }
+
+  dispose() {
+    if (this.typingInterval) {
+      clearInterval(this.typingInterval);
+      this.typingInterval = null;
+    }
+
+    if (this.sceneManager) {
+      this.sceneManager.dispose();
+      this.sceneManager = null;
+    }
   }
 }
 
-init().then(() => {
-  console.log("Portfolio loaded successfully!");
-
-  setTimeout(() => {
-    window.terminal3d = new Terminal3D({
-      bulge: 0.9,
-      scanlineIntensity: 0.02,
-      scanlineCount: 640,
-      vignetteIntensity: 0.3,
-      vignetteRadius: 0.26,
-      glowIntensity: 0.005,
-      glowColor: {
-        x: 0,
-        y: 0.01,
-        z: 0.01,
-      },
-      brightness: 0.85,
-      contrast: 1.05,
-      offsetX: 0.54,
-      offsetY: 0.7,
-      sceneX: 0,
-      sceneY: 0,
-      sceneZ: 0,
-      skipIntro: true,
-    });
-
-    console.log("3D Terminal loaded in background!");
-  }, 1000);
-});
+let appManager = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const startButton = document.getElementById("start-button");
-  const muteBtn = document.getElementById("mute-btn");
-
-  simulateLoading();
-
-  startButton.addEventListener("click", startWebsite);
-  muteBtn.addEventListener("click", toggleMute);
-
-  document.addEventListener("keydown", (event) => {
-    if (
-      !isWebsiteStarted &&
-      (event.code === "Enter" || event.code === "Space")
-    ) {
-      event.preventDefault();
-      startWebsite();
-    }
-
-    if (
-      isWebsiteStarted &&
-      (event.ctrlKey || event.metaKey) &&
-      event.key === "d"
-    ) {
-      event.preventDefault();
-      window.toggleDebug();
-    }
-
-    if (isWebsiteStarted && event.key.toLowerCase() === "m") {
-      event.preventDefault();
-      toggleMute();
-    }
-  });
-
-  window.toggleDebug = () => {
-    if (window.terminal3d) {
-      window.terminal3d.toggleDebugPanel();
-    }
-  };
+  appManager = new AppManager();
 });
-
-document.addEventListener("terminalReady", (event) => {
-  console.log("Terminal is ready", event.detail.terminal3d);
-});
-
-window.addEventListener("beforeunload", () => {
-  if (window.terminal3d) {
-    window.terminal3d.dispose();
-  }
-  if (typingInterval) {
-    clearInterval(typingInterval);
-  }
-});
-
-export { Terminal3D };

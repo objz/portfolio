@@ -1,17 +1,18 @@
 import * as THREE from "three";
 
 export class EffectsManager {
-  constructor(renderer, scene, camera) {
+  constructor(renderer, scene, camera, performanceMode) {
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
+    this.performanceMode = performanceMode;
     this.composer = null;
     this.supportsPostProcessing = false;
     this.bloomPulse = 0;
     this.bloomDirection = 1;
   }
 
-  async trySetupPostProcessing() {
+  async setupPostProcessing() {
     try {
       const [
         { EffectComposer },
@@ -33,7 +34,7 @@ export class EffectsManager {
         ),
       ]);
 
-      this.setupPostProcessing(
+      this.createComposer(
         EffectComposer,
         RenderPass,
         UnrealBloomPass,
@@ -43,11 +44,11 @@ export class EffectsManager {
     } catch (error) {
       console.warn("Post-processing not available:", error);
       this.supportsPostProcessing = false;
-      this.setupManualBloom();
+      this.setupBloom();
     }
   }
 
-  setupPostProcessing(EffectComposer, RenderPass, UnrealBloomPass, OutputPass) {
+  createComposer(EffectComposer, RenderPass, UnrealBloomPass, OutputPass) {
     this.composer = new EffectComposer(this.renderer);
 
     const renderPass = new RenderPass(this.scene, this.camera);
@@ -65,12 +66,12 @@ export class EffectsManager {
     this.composer.addPass(outputPass);
   }
 
-  setupManualBloom() {
+  setupBloom() {
     this.bloomPulse = 0;
     this.bloomDirection = 1;
   }
 
-  updateManualBloom(screenMesh) {
+  updateBloom(screenMesh) {
     if (!this.supportsPostProcessing && screenMesh && screenMesh.material) {
       this.bloomPulse += 0.02 * this.bloomDirection;
 
@@ -94,13 +95,13 @@ export class EffectsManager {
     }
   }
 
-  dispose() {
-    if (this.composer) this.composer.dispose();
-  }
-
   onResize() {
     if (this.composer) {
       this.composer.setSize(window.innerWidth, window.innerHeight);
     }
+  }
+
+  dispose() {
+    if (this.composer) this.composer.dispose();
   }
 }

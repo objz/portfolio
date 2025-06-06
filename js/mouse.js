@@ -1,12 +1,12 @@
-export class Mouse {
-  constructor(camera, controls, modelManager, performanceMode = false) {
+export class MouseManager {
+  constructor(camera, controls, modelManager, performanceMode) {
     this.camera = camera;
     this.controls = controls;
     this.modelManager = modelManager;
     this.performanceMode = performanceMode;
 
     this.mousePosition = { x: 0, y: 0 };
-    this.lastMousePosition = { x: 0, y: 0 };
+    this.lastPosition = { x: 0, y: 0 };
     this.mouseVelocity = { x: 0, y: 0 };
 
     this.reactionIntensity = this.performanceMode ? 0.15 : 0.25;
@@ -14,8 +14,8 @@ export class Mouse {
     this.maxMovement = this.performanceMode ? 0.1 : 0.15;
     this.maxFloat = this.performanceMode ? 0.05 : 0.08;
 
-    this.isActive = false;
-    this.isReady = false;
+    this.active = false;
+    this.ready = false;
     this.currentPosition = { x: 0, y: 0, z: 0 };
     this.targetPosition = { x: 0, y: 0, z: 0 };
 
@@ -25,7 +25,7 @@ export class Mouse {
     this.updateInterval = this.performanceMode ? 50 : 16;
 
     this.introComplete = false;
-    this.canBeActivated = false;
+    this.canActivate = false;
 
     this.init();
   }
@@ -46,7 +46,7 @@ export class Mouse {
 
       this.currentPosition = { ...this.originalPosition };
       this.targetPosition = { ...this.originalPosition };
-      this.isReady = true;
+      this.ready = true;
     } else if (!this.originalPosition) {
       setTimeout(() => {
         this.checkReadiness();
@@ -54,8 +54,8 @@ export class Mouse {
     }
   }
 
-  updateMousePosition(normalizedX, normalizedY, isTerminalFocused) {
-    if (!this.isReady || !this.introComplete || !this.canBeActivated) {
+  updatePosition(normalizedX, normalizedY, terminalFocused) {
+    if (!this.ready || !this.introComplete || !this.canActivate) {
       return;
     }
 
@@ -66,20 +66,18 @@ export class Mouse {
     }
     this.lastUpdateTime = now;
 
-    this.lastMousePosition.x = this.mousePosition.x;
-    this.lastMousePosition.y = this.mousePosition.y;
+    this.lastPosition.x = this.mousePosition.x;
+    this.lastPosition.y = this.mousePosition.y;
 
     this.mousePosition.x = normalizedX;
     this.mousePosition.y = normalizedY;
 
-    this.mouseVelocity.x =
-      (this.mousePosition.x - this.lastMousePosition.x) * 5;
-    this.mouseVelocity.y =
-      (this.mousePosition.y - this.lastMousePosition.y) * 5;
+    this.mouseVelocity.x = (this.mousePosition.x - this.lastPosition.x) * 5;
+    this.mouseVelocity.y = (this.mousePosition.y - this.lastPosition.y) * 5;
 
-    this.isActive = !isTerminalFocused;
+    this.active = !terminalFocused;
 
-    if (this.isActive) {
+    if (this.active) {
       this.calculateMovement();
     } else {
       this.returnToRest();
@@ -133,7 +131,7 @@ export class Mouse {
   }
 
   update() {
-    if (!this.modelManager.pcModel || !this.isReady) return;
+    if (!this.modelManager.pcModel || !this.ready) return;
 
     this.currentPosition.x +=
       (this.targetPosition.x - this.currentPosition.x) * (1 - this.dampening);
@@ -148,13 +146,13 @@ export class Mouse {
   }
 
   setEnabled(enabled) {
-    this.isActive = enabled;
+    this.active = enabled;
     if (!enabled) {
       this.returnToRest();
     }
   }
 
-  setReactionIntensity(intensity) {
+  setIntensity(intensity) {
     this.reactionIntensity = Math.max(0, Math.min(1, intensity));
   }
 
@@ -163,14 +161,14 @@ export class Mouse {
   }
 
   onTerminalFocused() {
-    this.isActive = false;
+    this.active = false;
     this.returnToRest();
   }
 
   onTerminalBlurred(hasEverBeenUnfocused = false) {
-    if (this.isReady && this.introComplete && hasEverBeenUnfocused) {
-      this.canBeActivated = true;
-      this.isActive = true;
+    if (this.ready && this.introComplete && hasEverBeenUnfocused) {
+      this.canActivate = true;
+      this.active = true;
     }
   }
 

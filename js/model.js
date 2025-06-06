@@ -11,15 +11,14 @@ export class ModelManager {
     this.fadeStartTime = null;
     this.fadeInDuration = 4000;
 
-    this.performanceMode = this.detectPerformanceMode();
+    this.performanceMode = this.detectDevice();
     this.textureSize = this.performanceMode ? 512 : 1024;
     this.shadowMapSize = this.performanceMode ? 1024 : 2048;
     this.enableMipmaps = !this.performanceMode;
-
     this.geometrySimplification = this.performanceMode ? 0.5 : 1.0;
   }
 
-  detectPerformanceMode() {
+  detectDevice() {
     const canvas = document.createElement("canvas");
     const gl =
       canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
@@ -31,15 +30,13 @@ export class ModelManager {
       /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent,
       );
-    const isLowEndGPU = /Intel|Mali|Adreno 3|Adreno 4|PowerVR SGX/i.test(
-      renderer,
-    );
+    const lowGpu = /Intel|Mali|Adreno 3|Adreno 4|PowerVR SGX/i.test(renderer);
     const memory = navigator.deviceMemory || 4;
 
-    return isMobile || isLowEndGPU || memory < 4;
+    return isMobile || lowGpu || memory < 4;
   }
 
-  async loadPCModel() {
+  async loadModel() {
     return new Promise((resolve) => {
       const loader = new GLTFLoader();
 
@@ -56,7 +53,7 @@ export class ModelManager {
 
           this.optimizeModel();
           this.scene.add(this.pcModel);
-          this.startSceneFadeIn();
+          this.startFadeIn();
           resolve();
         },
         (prog) => {
@@ -88,7 +85,7 @@ export class ModelManager {
 
         if (c.material) {
           this.optimizeMaterial(c.material);
-          this.identifyScreenMesh(c);
+          this.identifyScreen(c);
         }
       } else if (c.isMesh) {
         c.parent.remove(c);
@@ -96,7 +93,7 @@ export class ModelManager {
     });
 
     if (!this.screenMesh) {
-      this.findScreenMesh();
+      this.findScreen();
     }
   }
 
@@ -147,7 +144,6 @@ export class ModelManager {
 
     if (material.isMeshStandardMaterial) {
       material.envMapIntensity = this.performanceMode ? 0.1 : 0.3;
-
       material.roughness = Math.max(
         this.performanceMode ? 0.5 : 0.4,
         material.roughness * (this.performanceMode ? 1.3 : 1.2),
@@ -200,7 +196,7 @@ export class ModelManager {
     }
   }
 
-  identifyScreenMesh(mesh) {
+  identifyScreen(mesh) {
     const n = mesh.name.toLowerCase();
     const m = mesh.material?.name?.toLowerCase() || "";
 
@@ -215,7 +211,7 @@ export class ModelManager {
     }
   }
 
-  findScreenMesh() {
+  findScreen() {
     const candidates = [];
     this.pcModel.traverse((c) => {
       if (c.isMesh && c.geometry) {
@@ -237,7 +233,7 @@ export class ModelManager {
     }
   }
 
-  startSceneFadeIn() {
+  startFadeIn() {
     this.fadeStartTime = Date.now();
 
     if (this.performanceMode) {
@@ -252,7 +248,7 @@ export class ModelManager {
     });
   }
 
-  updateSceneFadeIn() {
+  updateFadeIn() {
     if (!this.fadeStartTime) return;
 
     const elapsed = Date.now() - this.fadeStartTime;

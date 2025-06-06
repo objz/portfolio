@@ -1,13 +1,13 @@
 import * as THREE from "three";
 
-export class CRTShader {
+export class ShaderManager {
   constructor(terminalTexture, crtSettings) {
     this.terminalTexture = terminalTexture;
     this.crtSettings = crtSettings;
-    this.originalScreenGeometry = null;
+    this.originalGeometry = null;
   }
 
-  createCRTMaterial() {
+  createMaterial() {
     const vertexShader = `
       varying vec2 vUv;
       varying vec3 vNormal;
@@ -92,7 +92,7 @@ export class CRTShader {
     });
   }
 
-  createBulgedScreenGeometry(originalGeometry, bulgeAmount) {
+  createBulgedGeometry(originalGeometry, bulgeAmount) {
     const geometry = originalGeometry.clone();
     const positionAttribute = geometry.getAttribute("position");
     const positions = positionAttribute.array;
@@ -132,15 +132,15 @@ export class CRTShader {
     return geometry;
   }
 
-  applyRealBulgeToScreen(screenMesh) {
+  applyBulgeToScreen(screenMesh) {
     if (!screenMesh || !screenMesh.geometry) return;
 
-    if (!this.originalScreenGeometry) {
-      this.originalScreenGeometry = screenMesh.geometry.clone();
+    if (!this.originalGeometry) {
+      this.originalGeometry = screenMesh.geometry.clone();
     }
 
-    const bulgedGeometry = this.createBulgedScreenGeometry(
-      this.originalScreenGeometry,
+    const bulgedGeometry = this.createBulgedGeometry(
+      this.originalGeometry,
       this.crtSettings.bulge,
     );
 
@@ -156,7 +156,7 @@ export class CRTShader {
       newSettings.offsetX !== undefined ||
       newSettings.offsetY !== undefined
     ) {
-      this.applyRealBulgeToScreen(screenMesh);
+      this.applyBulgeToScreen(screenMesh);
     }
 
     if (screenMesh?.material?.uniforms) {
@@ -189,8 +189,8 @@ export class CRTShader {
   }
 
   dispose() {
-    if (this.originalScreenGeometry) {
-      this.originalScreenGeometry.dispose();
+    if (this.originalGeometry) {
+      this.originalGeometry.dispose();
     }
   }
 }
