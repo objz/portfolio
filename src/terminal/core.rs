@@ -34,7 +34,7 @@ impl Terminal {
             .dyn_into::<CanvasRenderingContext2d>()
             .expect("failed to cast to CanvasRenderingContext2d");
 
-        let renderer = TerminalRenderer::new(canvas, context);
+        let renderer = TerminalRenderer::new(canvas.clone(), context);
         let command_handler = CommandHandler::new();
         let base_prompt = "objz@portfolio".to_string();
 
@@ -43,11 +43,59 @@ impl Terminal {
             renderer.max_visible_lines(),
         );
 
-        Self {
+        let terminal = Self {
             renderer,
             command_handler,
             base_prompt,
-        }
+        };
+
+        terminal.setup_click_handler(&canvas);
+        terminal
+    }
+
+    fn setup_click_handler(&self, canvas: &HtmlCanvasElement) {
+        let renderer_clone = self.renderer.clone();
+
+        let click_closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            if event.button() == 1 || event.ctrl_key() {
+                let rect = renderer_clone.canvas.get_bounding_client_rect();
+                let x = event.client_x() as f64 - rect.left();
+                let y = event.client_y() as f64 - rect.top();
+
+                if let Some(url) = renderer_clone.handle_click(x, y) {
+                    event.prevent_default();
+                    event.stop_propagation();
+                    let window = web_sys::window().unwrap();
+                    let _ = window.open_with_url_and_target(&url, "_blank");
+                }
+            }
+        }) as Box<dyn FnMut(_)>);
+
+        let renderer_clone2 = self.renderer.clone();
+        let mousemove_closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            let rect = renderer_clone2.canvas.get_bounding_client_rect();
+            let x = event.client_x() as f64 - rect.left();
+            let y = event.client_y() as f64 - rect.top();
+
+            let cursor = if renderer_clone2.handle_click(x, y).is_some() {
+                "pointer"
+            } else {
+                "default"
+            };
+
+            let style = renderer_clone2.canvas.style();
+            let _ = style.set_property("cursor", cursor);
+        }) as Box<dyn FnMut(_)>);
+
+        let _ = canvas
+            .add_event_listener_with_callback("mousedown", click_closure.as_ref().unchecked_ref());
+        let _ = canvas.add_event_listener_with_callback(
+            "mousemove",
+            mousemove_closure.as_ref().unchecked_ref(),
+        );
+
+        click_closure.forget();
+        mousemove_closure.forget();
     }
 
     pub fn get_current_prompt(&self) -> String {

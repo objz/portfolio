@@ -1,6 +1,7 @@
 use super::buffer::{self, BufferLine, InputMode, LineType, TerminalState};
+use super::linkmap::LinkMap;
 use js_sys::Promise;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{window, CanvasRenderingContext2d, HtmlCanvasElement};
@@ -43,6 +44,7 @@ pub struct TerminalRenderer {
     pub char_width: f64,
     pub font_size: i32,
     pub cursor_blink_state: Cell<bool>,
+    linkmap: RefCell<LinkMap>,
 }
 
 impl TerminalRenderer {
@@ -67,6 +69,7 @@ impl TerminalRenderer {
             char_width,
             font_size,
             cursor_blink_state: Cell::new(true),
+            linkmap: RefCell::new(LinkMap::new()),
         }
     }
 
@@ -134,6 +137,7 @@ impl TerminalRenderer {
             .fill_rect(0.0, 0.0, self.width as f64, self.height as f64);
         self.context.restore();
         self.y.set(20.0);
+        self.linkmap.borrow_mut().clear();
     }
 
     pub fn max_visible_lines(&self) -> usize {
@@ -205,10 +209,70 @@ impl TerminalRenderer {
     }
 
     pub fn draw_text(&self, text: &str, x: f64, y: f64, color: Option<&str>) {
+        self.linkmap
+            .borrow_mut()
+            .detect_links(text, x, y, self.char_width, self.line_height);
+
         self.context.save();
         self.setup_font();
-        self.set_fill_color(&self.get_color_value(color.unwrap_or("#ffffff")));
-        let _ = self.context.fill_text(text, x, y);
+
+        let mut current_x = x;
+        let mut pos = 0;
+
+        while pos < text.len() {
+            if let Some(http_start) = text[pos..].find("http") {
+                let absolute_start = pos + http_start;
+
+                let before_text = &text[pos..absolute_start];
+                if !before_text.is_empty() {
+                    self.set_fill_color(&self.get_color_value(color.unwrap_or("#ffffff")));
+                    let _ = self.context.fill_text(before_text, current_x, y);
+                    current_x += before_text.len() as f64 * self.char_width;
+                }
+
+                let remaining = &text[absolute_start..];
+                let url_end = remaining
+                    .find(|c: char| c.is_whitespace() || c == '\n' || c == ']')
+                    .unwrap_or(remaining.len());
+                let potential_url = &remaining[..url_end];
+
+                if potential_url.starts_with("http://") || potential_url.starts_with("https://") {
+                    self.set_fill_color("#00ffff");
+                    let _ = self.context.fill_text(potential_url, current_x, y);
+
+                    self.context.save();
+                    self.context
+                        .set_stroke_style(&wasm_bindgen::JsValue::from_str("#00ffff"));
+                    self.context.set_line_width(1.0);
+                    self.context.begin_path();
+                    self.context.move_to(current_x, y + self.line_height - 2.0);
+                    self.context.line_to(
+                        current_x + (potential_url.len() as f64 * self.char_width),
+                        y + self.line_height - 2.0,
+                    );
+                    let _ = self.context.stroke();
+                    self.context.restore();
+
+                    current_x += potential_url.len() as f64 * self.char_width;
+                    pos = absolute_start + url_end;
+                } else {
+                    self.set_fill_color(&self.get_color_value(color.unwrap_or("#ffffff")));
+                    let _ = self.context.fill_text(
+                        &text[absolute_start..absolute_start + 4],
+                        current_x,
+                        y,
+                    );
+                    current_x += 4.0 * self.char_width;
+                    pos = absolute_start + 4;
+                }
+            } else {
+                let remaining_text = &text[pos..];
+                self.set_fill_color(&self.get_color_value(color.unwrap_or("#ffffff")));
+                let _ = self.context.fill_text(remaining_text, current_x, y);
+                break;
+            }
+        }
+
         self.context.restore();
     }
 
@@ -355,6 +419,10 @@ impl TerminalRenderer {
         self.cursor_blink_state.set(false);
     }
 
+    pub fn handle_click(&self, x: f64, y: f64) -> Option<String> {
+        self.linkmap.borrow().find_link(x, y)
+    }
+
     pub async fn sleep(&self, ms: i32) {
         let promise = Promise::new(&mut |resolve, _reject| {
             let window = window().unwrap();
@@ -385,6 +453,7 @@ impl Clone for TerminalRenderer {
             char_width: self.char_width,
             font_size: self.font_size,
             cursor_blink_state: Cell::new(self.cursor_blink_state.get()),
+            linkmap: RefCell::new(LinkMap::new()),
         }
     }
 }

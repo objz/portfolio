@@ -34,7 +34,10 @@ features = [
   "HtmlCanvasElement",
   "CanvasRenderingContext2d",
   "TextMetrics",
-  "CustomEvent"
+  "CustomEvent",
+  "MouseEvent",
+  "DomRect",
+  "AddEventListenerOptions"
 ]
 
 [profile.release]
