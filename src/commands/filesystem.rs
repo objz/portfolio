@@ -136,7 +136,7 @@ lazy_static! {
                                     (
                                         "credits.txt".into(),
                                         File {
-                                            content: "This site was developed by objz.\n\nBuilt with:\n- Rust and WebAssembly (Wasm)\n- Three.js for 3D rendering\n\n3D model provided by Sketchfab: [Insert link here]\nLooping background music from Freesound: [https://github.com]\n\nNo warranty, express or implied.".into(),
+                                            content: "This site was developed by objz.\n\nBuilt with:\n- Rust and WebAssembly (Wasm)\n- Three.js for 3D rendering\n\n3D model provided by Sketchfab: [https://shorturl.at/OXITb]\nLooping background music from Freesound: [https://shorturl.at/YYufx]\n\nNo warranty, express or implied.".into(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
                                             protected: false,
