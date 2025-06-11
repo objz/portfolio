@@ -120,6 +120,8 @@ export class EventManager {
         ) {
           this.sceneManager.animationManager.animateToState("focused", 1000);
         }
+      } else if (intersects.length > 0 && this.sceneManager.terminalFocused) {
+        window.dispatchEvent(new CustomEvent("terminalBlur"));
       }
     }
   }
@@ -138,20 +140,10 @@ export class EventManager {
     if (this.sceneManager.terminalFocused && this.sceneManager.hoveringScreen) {
       event.preventDefault();
 
-      const scrollDelta = event.deltaY > 0 ? 1 : -1;
-      this.sceneManager.scrollPosition = Math.max(
-        0,
-        Math.min(
-          this.sceneManager.scrollHistory.length - 1,
-          this.sceneManager.scrollPosition + scrollDelta,
-        ),
-      );
-
-      if (this.sceneManager.terminalTexture) {
-        const scrollOffset =
-          this.sceneManager.scrollPosition /
-          Math.max(1, this.sceneManager.scrollHistory.length - 1);
-        this.sceneManager.terminalTexture.offset.y = scrollOffset * 0.2;
+      if (event.deltaY > 0) {
+        window.dispatchEvent(new CustomEvent("terminalScrollDown"));
+      } else {
+        window.dispatchEvent(new CustomEvent("terminalScrollUp"));
       }
     }
 
