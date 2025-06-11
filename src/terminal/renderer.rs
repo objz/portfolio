@@ -241,8 +241,7 @@ impl TerminalRenderer {
                     let _ = self.context.fill_text(potential_url, current_x, y);
 
                     self.context.save();
-                    self.context
-                        .set_stroke_style(&wasm_bindgen::JsValue::from_str("#00ffff"));
+                    self.context.set_stroke_style(&"#00ffff".into());
                     self.context.set_line_width(1.0);
                     self.context.begin_path();
                     self.context.move_to(current_x, y + self.line_height - 2.0);
@@ -421,6 +420,11 @@ impl TerminalRenderer {
 
     pub fn handle_click(&self, x: f64, y: f64) -> Option<String> {
         self.linkmap.borrow().find_link(x, y)
+    }
+
+    pub fn openlink(&self, url: &str) {
+        let window = web_sys::window().unwrap();
+        let _ = window.open_with_url_and_target(url, "_blank");
     }
 
     pub async fn sleep(&self, ms: i32) {

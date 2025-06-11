@@ -1,9 +1,10 @@
 use super::buffer;
 use super::renderer::{LineOptions, TerminalRenderer};
 use crate::commands::CommandHandler;
-use js_sys::Promise;
+use js_sys::{Array, Promise};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::console::log;
 use web_sys::{window, CanvasRenderingContext2d, Document, HtmlCanvasElement};
 
 #[derive(Clone)]
@@ -49,26 +50,38 @@ impl Terminal {
             base_prompt,
         };
 
-        terminal.setup_click_handler(&canvas);
+        terminal.setup_events(&canvas);
         terminal
     }
 
-    fn setup_click_handler(&self, canvas: &HtmlCanvasElement) {
+    fn setup_events(&self, canvas: &HtmlCanvasElement) {
         let renderer_clone = self.renderer.clone();
 
         let click_closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
-            if event.button() == 1 || event.ctrl_key() {
-                let rect = renderer_clone.canvas.get_bounding_client_rect();
-                let x = event.client_x() as f64 - rect.left();
-                let y = event.client_y() as f64 - rect.top();
+            let rect = renderer_clone.canvas.get_bounding_client_rect();
+            let x = event.client_x() as f64 - rect.left();
+            let y = event.client_y() as f64 - rect.top();
 
-                if let Some(url) = renderer_clone.handle_click(x, y) {
+            log(&Array::of5(
+                &"CLICK EVENT - coords:".into(),
+                &x.into(),
+                &y.into(),
+                &"button:".into(),
+                &event.button().into(),
+            ));
+
+            if let Some(url) = renderer_clone.handle_click(x, y) {
+                log(&Array::of2(&"Found URL:".into(), &url.clone().into()));
+
+                if event.button() == 1 || (event.button() == 0 && event.ctrl_key()) {
+                    log(&Array::of1(&"Opening link".into()));
                     event.prevent_default();
                     event.stop_propagation();
-                    let window = web_sys::window().unwrap();
-                    let _ = window.open_with_url_and_target(&url, "_blank");
+                    renderer_clone.openlink(&url);
+                    return;
                 }
             }
+            log(&Array::of1(&"No URL found or wrong button".into()));
         }) as Box<dyn FnMut(_)>);
 
         let renderer_clone2 = self.renderer.clone();
@@ -87,11 +100,23 @@ impl Terminal {
             let _ = style.set_property("cursor", cursor);
         }) as Box<dyn FnMut(_)>);
 
-        let _ = canvas
-            .add_event_listener_with_callback("mousedown", click_closure.as_ref().unchecked_ref());
-        let _ = canvas.add_event_listener_with_callback(
+        let canvas_el = canvas.clone();
+        canvas_el.set_attribute("tabindex", "0").unwrap();
+
+        let _ = canvas_el.add_event_listener_with_callback_and_add_event_listener_options(
+            "mouseup",
+            click_closure.as_ref().unchecked_ref(),
+            &web_sys::AddEventListenerOptions::new()
+                .capture(true)
+                .passive(false),
+        );
+
+        let _ = canvas_el.add_event_listener_with_callback_and_add_event_listener_options(
             "mousemove",
             mousemove_closure.as_ref().unchecked_ref(),
+            &web_sys::AddEventListenerOptions::new()
+                .capture(true)
+                .passive(true),
         );
 
         click_closure.forget();
