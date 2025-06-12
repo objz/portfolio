@@ -1,7 +1,7 @@
 use crate::terminal::{renderer::LineOptions, Terminal};
 
 pub async fn boot(term: &Terminal) {
-    let boot_messages = vec![
+    let messages = vec![
         "Loading Linux kernel version 6.8.9-wasm1-1...",
         "Loading initial ramdisk (initramfs)...",
         "Starting systemd-udevd v254.5-1...",
@@ -26,8 +26,8 @@ pub async fn boot(term: &Terminal) {
         "Starting Interface...",
     ];
 
-    for msg in boot_messages {
-        term.add_line(msg, Some(LineOptions::new().with_boot_animation()))
+    for msg in messages {
+        term.add_line(msg, Some(LineOptions::new().with_animation()))
             .await;
         term.sleep(15).await;
     }
@@ -36,24 +36,29 @@ pub async fn boot(term: &Terminal) {
 
 pub async fn logo(term: &Terminal) {
     let logo_lines = vec![
-        "                                                    ",
-        " ░▒▓██████▓▒░░▒▓███████▓▒░       ░▒▓█▓▒░▒▓████████▓▒░ ",
-        "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░",
-        "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░    ░▒▓██▓▒░ ",
-        "░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░       ░▒▓█▓▒░  ░▒▓██▓▒░   ",
-        "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓██▓▒░     ",
-        "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ",
-        " ░▒▓██████▓▒░░▒▓███████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░",
-        "                                                    ",
+        "             .           ",
+        "             7:          ",
+        "           .7J^          ",
+        "         .~?JJ:          ",
+        "       :!?JJJ~           ",
+        "     ^7JJJJ7:            ",
+        "   :7JJJJ7:   .^         ",
+        "  :?J?J?:     :J7.       ",
+        "  ~J?J?.      !JJ!       ",
+        "  .7JJ!     .7J?J?       ",
+        "    :~7:  .~?J?J?^       ",
+        "        .~?JJJ?!:        ",
+        "       :?JJJ?!:          ",
+        "      .?JJ7^.            ",
+        "      :JJ~               ",
+        "       7!                ",
+        "       `                 ",
     ];
 
     for line in logo_lines {
-        term.add_line(
-            line,
-            Some(LineOptions::new().with_typing(10).with_color("cyan")),
-        )
-        .await;
-        term.sleep(30).await;
+        term.add_line(line, Some(LineOptions::new().with_color("cyan")))
+            .await;
+        term.sleep(10).await;
     }
 }
 

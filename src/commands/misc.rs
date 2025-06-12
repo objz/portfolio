@@ -35,11 +35,10 @@ Run a project with `./project-name`.""#
 }
 
 pub fn sudo(args: &[&str]) -> String {
-    if args.len() >= 3 && args[0] == "rm" && args[1] == "-rf" && args[2] == "/" {
-        "SYSTEM_PANIC".to_string()
-    } else {
-        "[sudo] password for objz: \n\nSorry, try again.\n[sudo] password for objz: \n\nSudo access denied.".to_string()
+    if args.is_empty() {
+        return "sudo: command required".into();
     }
+    "Sudo access denied.".into()
 }
 
 pub fn cowsay(args: &[&str]) -> String {

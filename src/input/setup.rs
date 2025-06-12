@@ -30,6 +30,10 @@ impl InputHandler {
             let hidden_input = hidden_input_clone.clone();
 
             Closure::wrap(Box::new(move |_event: web_sys::Event| {
+                let state = buffer::get_terminal_state();
+                if state.input_mode == InputMode::Disabled {
+                    return;
+                }
                 let current_value = hidden_input.value();
                 CURRENT_INPUT.with(|input| {
                     *input.borrow_mut() = current_value.clone();
@@ -57,6 +61,11 @@ impl InputHandler {
             let processor = RefCell::new(processor);
 
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
+                let state = buffer::get_terminal_state();
+                if state.input_mode == InputMode::Disabled {
+                    event.prevent_default();
+                    return;
+                }
                 let current_input = CURRENT_INPUT.with(|input| input.borrow().clone());
 
                 match event.key().as_str() {
@@ -307,6 +316,10 @@ impl InputHandler {
         terminal: &Terminal,
         hidden_input: &HtmlInputElement,
     ) {
+        let state = buffer::get_terminal_state();
+        if state.input_mode == InputMode::Disabled {
+            return;
+        }
         let trimmed_input = current_input.trim();
 
         if panic::should_panic(trimmed_input) {
@@ -317,7 +330,7 @@ impl InputHandler {
             hidden_input.set_value("");
             CURRENT_INPUT.with(|input| input.borrow_mut().clear());
             buffer::update_input_state(String::new(), 0);
-            buffer::set_input_mode(InputMode::Processing);
+            buffer::set_input_mode(InputMode::Disabled);
 
             let terminal_clone = terminal.clone();
             let hidden_input_clone = hidden_input.clone();
@@ -337,7 +350,7 @@ impl InputHandler {
         hidden_input.set_value("");
         CURRENT_INPUT.with(|input| input.borrow_mut().clear());
         buffer::update_input_state(String::new(), 0);
-        buffer::set_input_mode(InputMode::Processing);
+        buffer::set_input_mode(InputMode::Disabled);
 
         if !trimmed_input.is_empty() {
             let (result, _directory_changed) = processor.handle(trimmed_input);
@@ -378,6 +391,10 @@ impl InputHandler {
     }
 
     fn handle_tab(terminal: &Terminal, hidden_input: &HtmlInputElement, current_input: &str) {
+        let state = buffer::get_terminal_state();
+        if state.input_mode == InputMode::Disabled {
+            return;
+        }
         let current_path = {
             use crate::commands::filesystem::CURRENT_PATH;
             CURRENT_PATH.lock().unwrap().clone()

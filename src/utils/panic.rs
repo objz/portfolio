@@ -1,55 +1,44 @@
 use crate::terminal::buffer::InputMode;
+use crate::terminal::renderer::LineOptions;
 use crate::terminal::{buffer, Terminal};
-use crate::utils::panic::buffer::LineType;
 
 pub async fn trigger(terminal: &Terminal) {
     buffer::clear_buffer();
     buffer::set_input_mode(InputMode::Disabled);
 
     let panic_lines = vec![
-        ("⚠️  CRITICAL SYSTEM ERROR ⚠️", Some("error")),
-        ("", None),
-        ("Deleting root filesystem...", Some("warning")),
-        ("rm: removing /usr... ████████████░░░░ 75%", Some("warning")),
-        ("rm: removing /var... ██████████████░░ 87%", Some("warning")),
-        (
-            "rm: removing /etc... ████████████████ 100%",
-            Some("warning"),
-        ),
-        ("", None),
-        ("SYSTEM DESTROYED", Some("error")),
-        ("", None),
-        (
-            "Just kidding! This is a just simulated, not your actual system.",
-            Some("success"),
-        ),
-        ("Nice try though!", Some("success")),
-        ("", None),
-        (
-            "(Don't actually run 'sudo rm -rf /' on real systems!)",
-            Some("warning"),
-        ),
+        ("CRITICAL SYSTEM ERROR", "error"),
+        ("", ""),
+        ("Deleting root filesystem...", "warning"),
+        ("rm: removing /usr... ████████████░░░░ 75%", "warning"),
+        ("rm: removing /var... ██████████████░░ 87%", "warning"),
+        ("rm: removing /etc... ████████████████ 100%", "warning"),
+        ("", ""),
+        ("Filesystem table corrupted.", "error"),
+        ("Kernel panic: Attempted to kill init!", "error"),
+        ("System halt issued.", "error"),
+        ("", ""),
+        ("Emergency shutdown in 3...", "warning"),
+        ("Emergency shutdown in 2...", "warning"),
+        ("Emergency shutdown in 1...", "warning"),
+        ("", ""),
+        ("Shutdown failed. Recovery was possible.", "success"),
     ];
 
     for (line, color) in panic_lines {
-        buffer::add_line(
-            line.to_string(),
-            LineType::System,
-            color.map(|s| s.to_string()),
-        );
+        let options = if line.starts_with("rm: removing") {
+            None
+        } else {
+            Some(LineOptions::new().with_typing(20).with_color(color))
+        };
+
+        terminal.add_line(line, options).await;
         terminal.render();
-        terminal.sleep(1400).await;
+        terminal.sleep(700).await;
     }
 
-    terminal.sleep(2000).await;
-
+    terminal.sleep(1000).await;
     buffer::clear_buffer();
-    buffer::add_line(
-        "System restored! Terminal is back online.".to_string(),
-        LineType::System,
-        Some("success".to_string()),
-    );
-    buffer::add_line("".to_string(), LineType::Normal, None);
     terminal.render();
 }
 

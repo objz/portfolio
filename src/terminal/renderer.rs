@@ -23,7 +23,7 @@ impl LineOptions {
         self
     }
 
-    pub fn with_boot_animation(mut self) -> Self {
+    pub fn with_animation(mut self) -> Self {
         self.boot_animation = true;
         self
     }
@@ -341,11 +341,8 @@ impl TerminalRenderer {
         match line_type {
             LineType::Command => "#00ffff",
             LineType::Output => "#ffffff",
-            LineType::_Error => "#ff0000",
-            LineType::System => "#ffff00",
             LineType::Boot => "#ffffff",
             LineType::Typing => "#ffffff",
-            LineType::_Prompt => "#00ffff",
             LineType::Normal => "#ffffff",
         }
         .to_string()

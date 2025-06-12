@@ -7,9 +7,6 @@ pub enum LineType {
     Output,
     Boot,
     Typing,
-    _Prompt,
-    _Error,
-    System,
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +89,6 @@ pub struct TerminalState {
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputMode {
     Normal,
-    Processing,
     Disabled,
 }
 
