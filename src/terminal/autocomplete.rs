@@ -31,7 +31,7 @@ impl AutoComplete {
             let partial_path = parts.last().map_or("", |v| v);
 
             match command {
-                "cd" | "ls" | "cat" | "tree" | "rm" | "mkdir" | "touch" => {
+                "cd" | "ls" | "cat" | "tree" | "rm" | "mkdir" | "touch" | "ln" => {
                     self.complete_path(partial_path, current_path, command == "cd")
                 }
                 _ => CompletionResult::None,
@@ -60,7 +60,7 @@ impl AutoComplete {
         current_path: &[String],
         dirs_only: bool,
     ) -> CompletionResult {
-        use crate::commands::filesystem::{get_filesystem_entries, normalize_path};
+        use crate::commands::filesystem::{autocomplete_entries, normalize_path};
 
         let (dir_path, filename_prefix) = if partial.contains('/') {
             let last_slash = partial.rfind('/').unwrap();
@@ -75,7 +75,7 @@ impl AutoComplete {
             normalize_path(dir_path, current_path)
         };
 
-        let entries = get_filesystem_entries(&search_path, dirs_only);
+        let entries = autocomplete_entries(&search_path, dirs_only);
 
         let matches: Vec<String> = entries
             .into_iter()

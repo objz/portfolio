@@ -145,7 +145,7 @@ impl InputHandler {
                     }
                     "Tab" => {
                         event.prevent_default();
-                        Self::tab_complete(&terminal, &hidden_input, &current_input);
+                        Self::handle_tab(&terminal, &hidden_input, &current_input);
                     }
                     _ => {}
                 }
@@ -323,7 +323,7 @@ impl InputHandler {
             let hidden_input_clone = hidden_input.clone();
             spawn_local(async move {
                 panic::trigger(&terminal_clone).await;
-                Self::prepare_input(&terminal_clone, &hidden_input_clone);
+                Self::handle_input(&terminal_clone, &hidden_input_clone);
             });
             return;
         }
@@ -345,29 +345,29 @@ impl InputHandler {
             match result.as_str() {
                 "CLEAR_SCREEN" => {
                     buffer::clear_buffer();
-                    Self::prepare_input(terminal, hidden_input);
+                    Self::handle_input(terminal, hidden_input);
                 }
                 "SYSTEM_PANIC" => {
                     let terminal_clone = terminal.clone();
                     let hidden_input_clone = hidden_input.clone();
                     spawn_local(async move {
                         panic::trigger(&terminal_clone).await;
-                        Self::prepare_input(&terminal_clone, &hidden_input_clone);
+                        Self::handle_input(&terminal_clone, &hidden_input_clone);
                     });
                 }
                 _ => {
                     if !result.is_empty() {
                         buffer::add_output_lines(&result, None);
                     }
-                    Self::prepare_input(terminal, hidden_input);
+                    Self::handle_input(terminal, hidden_input);
                 }
             }
         } else {
-            Self::prepare_input(terminal, hidden_input);
+            Self::handle_input(terminal, hidden_input);
         }
     }
 
-    fn prepare_input(terminal: &Terminal, hidden_input: &HtmlInputElement) {
+    fn handle_input(terminal: &Terminal, hidden_input: &HtmlInputElement) {
         let prompt = terminal.get_current_prompt();
         buffer::set_current_prompt(prompt);
         buffer::set_input_mode(InputMode::Normal);
@@ -377,7 +377,7 @@ impl InputHandler {
         let _ = hidden_input.focus();
     }
 
-    fn tab_complete(terminal: &Terminal, hidden_input: &HtmlInputElement, current_input: &str) {
+    fn handle_tab(terminal: &Terminal, hidden_input: &HtmlInputElement, current_input: &str) {
         let current_path = {
             use crate::commands::filesystem::CURRENT_PATH;
             CURRENT_PATH.lock().unwrap().clone()
@@ -471,7 +471,7 @@ impl InputHandler {
 
                 buffer::add_output_lines(&completions_text, None);
 
-                Self::prepare_input(terminal, hidden_input);
+                Self::handle_input(terminal, hidden_input);
                 hidden_input.set_value(current_input);
                 CURRENT_INPUT.with(|input| {
                     *input.borrow_mut() = current_input.to_string();

@@ -14,7 +14,7 @@ impl CommandHandler {
         }
     }
 
-    pub fn get_current_directory(&self) -> String {
+    pub fn get_working_dir(&self) -> String {
         commands::pwd(&[])
     }
 
@@ -33,7 +33,7 @@ impl CommandHandler {
 
         let output = match cmd {
             "clear" => system::clear(args),
-            "history" => self.show_history(args),
+            "history" => self.print_history(args),
             "echo" => system::echo(args),
             "date" => system::date(args),
             "uptime" => system::uptime(args),
@@ -64,7 +64,7 @@ impl CommandHandler {
         (output, directory_changed)
     }
 
-    fn show_history(&self, _args: &[&str]) -> String {
+    fn print_history(&self, _args: &[&str]) -> String {
         if self.history.is_empty() {
             "No commands in history yet.".to_string()
         } else {

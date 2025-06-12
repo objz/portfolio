@@ -61,20 +61,20 @@ lazy_static! {
                     Directory {
                         permissions: 0o755,
                         owner: "root".to_string(),
-                        protected: false,
+                        protected: true,
                         children: HashMap::from([(
                             "objz".into(),
                             Directory {
                                 permissions: 0o755,
                                 owner: "objz".to_string(),
-                                protected: false,
+                                protected: true,
                                 children: HashMap::from([
                                     (
                                         "projects".into(),
                                         Directory {
                                             permissions: 0o755,
                                             owner: "objz".to_string(),
-                                            protected: false,
+                                            protected: true,
                                             children: HashMap::from([
                                                 (
                                                     "CommandBridge.md".into(),
@@ -82,7 +82,7 @@ lazy_static! {
                                                         content: "A scripting-based plugin enabling advanced command forwarding between Velocity and Paper Minecraft servers. Supports flexible automation and custom workflows for server administrators.\n\nProject link: [https://github.com/objz/CommandBridge]\n\nStatus: Active development".into(),
                                                         permissions: 0o644,
                                                         owner: "objz".to_string(),
-                                                        protected: false,
+                                                        protected: true,
                                                     }
                                                 ),
                                                 (
@@ -91,7 +91,7 @@ lazy_static! {
                                                         content: "A fast, Rust-powered command-line Minecraft launcher focused on performance and simplicity. Designed for direct launching, version management, and mod integration.\n\nProject link: [https://github.com/objz/mcl]\n\nStatus: In development (not finished yet)".into(),
                                                         permissions: 0o644,
                                                         owner: "objz".to_string(),
-                                                        protected: false,
+                                                        protected: true,
                                                     }
                                                 ),
                                                 (
@@ -100,7 +100,7 @@ lazy_static! {
                                                         content: "An Excel VSTO add-in for importing and synchronizing Power BI queries directly into spreadsheets. Built for seamless integration and efficient data workflows in enterprise environments.\n\nProject link: [https://github.com/objz/PowerImport]\n\nStatus: Completed".into(),
                                                         permissions: 0o644,
                                                         owner: "objz".to_string(),
-                                                        protected: false,
+                                                        protected: true,
                                                     }
                                                 ),
                                             ]),
@@ -112,7 +112,7 @@ lazy_static! {
                                             content: "Hi, I'm objz and I'm 17 years old.\nMy main skills are:\n\n- Rust (primary)\n- Java (primary)\n- C (occasionally)\n- Web Development (only if absolutely necessary)".into(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
-                                            protected: false,
+                                            protected: true,
                                         }
                                     ),
                                     (
@@ -121,7 +121,7 @@ lazy_static! {
                                             content: "GitHub: @objz\nEmail: me@objz.dev\nLocation: Bavaria, Germany\nResponse time: Eventually™".into(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
-                                            protected: false,
+                                            protected: true,
                                         }
                                     ),
                                     (
@@ -139,7 +139,7 @@ lazy_static! {
                                             content: "This site was developed by objz.\n\nBuilt with:\n- Rust and WebAssembly (Wasm)\n- Three.js for 3D rendering\n\n3D model provided by Sketchfab: [https://shorturl.at/OXITb]\nLooping background music from Freesound: [https://shorturl.at/YYufx]\n\nNo warranty, express or implied.".into(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
-                                            protected: false,
+                                            protected: true,
                                         }
                                     ),
                                 ]),
@@ -230,7 +230,7 @@ lazy_static! {
                                         (
                                             "boot.log".into(),
                                             File {
-                                                content: "Loading Linux kernel version 6.8.9-arch1-1...\nLoading initial ramdisk (initramfs)...\nStarting systemd-udevd v254.5-1...\nProbing hardware...\nDetected storage device: /dev/nvme0n1\nDetected storage device: /dev/sda\nActivating swap on /dev/sda2...\nMounting root filesystem...\nChecking file system on /dev/sda1...\nMounting /boot...\nMounting /home...\nMounting /var...\nStarting systemd-journald.service...\nStarting systemd-tmpfiles-setup-dev.service...\nStarting systemd-sysctl.service...\nStarting Load Kernel Modules...\nLoading kernel modules: i915 ext4 fuse...\nStarting Network Manager...\nStarting Login Service (systemd-logind)...\nStarting Authorization Manager (polkitd)...\nStarting User Manager for UID 1000...\nStarting Interface...".into(),
+                                                content: "Loading Linux kernel version 6.8.9-wasm-1...\nLoading initial ramdisk (initramfs)...\nStarting systemd-udevd v254.5-1...\nProbing hardware...\nDetected storage device: /dev/nvme0n1\nDetected storage device: /dev/sda\nActivating swap on /dev/sda2...\nMounting root filesystem...\nChecking file system on /dev/sda1...\nMounting /boot...\nMounting /home...\nMounting /var...\nStarting systemd-journald.service...\nStarting systemd-tmpfiles-setup-dev.service...\nStarting systemd-sysctl.service...\nStarting Load Kernel Modules...\nLoading kernel modules: i915 ext4 fuse...\nStarting Network Manager...\nStarting Login Service (systemd-logind)...\nStarting Authorization Manager (polkitd)...\nStarting User Manager for UID 1000...\nStarting Interface...".into(),
                                                 permissions: 0o644,
                                                 owner: "root".to_string(),
                                                 protected: true,
@@ -278,7 +278,7 @@ pub fn normalize_path(path: &str, current: &[String]) -> Vec<String> {
     }
 }
 
-pub fn get_node_at_path<'a>(root: &'a Node, path: &[String]) -> Option<&'a Node> {
+pub fn get_node<'a>(root: &'a Node, path: &[String]) -> Option<&'a Node> {
     let mut current = root;
     for part in path {
         if let Node::Directory { children, .. } = current {
@@ -290,7 +290,7 @@ pub fn get_node_at_path<'a>(root: &'a Node, path: &[String]) -> Option<&'a Node>
     Some(current)
 }
 
-pub fn get_node_at_path_mut<'a>(root: &'a mut Node, path: &[String]) -> Option<&'a mut Node> {
+pub fn get_node_mut<'a>(root: &'a mut Node, path: &[String]) -> Option<&'a mut Node> {
     let mut current = root;
     for part in path {
         if let Node::Directory { children, .. } = current {
@@ -302,10 +302,10 @@ pub fn get_node_at_path_mut<'a>(root: &'a mut Node, path: &[String]) -> Option<&
     Some(current)
 }
 
-pub fn get_filesystem_entries(path: &[String], dirs_only: bool) -> Vec<String> {
+pub fn autocomplete_entries(path: &[String], dirs_only: bool) -> Vec<String> {
     let filesystem = FILESYSTEM.lock().unwrap();
 
-    match get_node_at_path(&filesystem, path) {
+    match get_node(&filesystem, path) {
         Some(Node::Directory { children, .. }) => {
             let mut entries: Vec<String> = children
                 .iter()
@@ -319,7 +319,7 @@ pub fn get_filesystem_entries(path: &[String], dirs_only: bool) -> Vec<String> {
                         match node {
                             Node::Directory { .. } => Some(format!("{}/", name)),
                             Node::File { .. } => Some(name.clone()),
-                            Node::Symlink { .. } => Some(format!("{}@", name)),
+                            Node::Symlink { .. } => Some(name.clone()),
                         }
                     }
                 })

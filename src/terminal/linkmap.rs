@@ -1,6 +1,4 @@
-use js_sys::Array;
 use std::collections::HashMap;
-use web_sys::console::log;
 
 #[derive(Debug, Clone)]
 pub struct LinkInfo {
@@ -50,18 +48,6 @@ impl LinkMap {
                     let start_x = x + (url_start as f64 * char_width);
                     let end_x = start_x + (url.len() as f64 * char_width);
 
-                    log(&Array::of1(
-                        &format!(
-                            "Detected link: {} at ({}, {}) to ({}, {})",
-                            url,
-                            start_x,
-                            y,
-                            end_x,
-                            y + line_height
-                        )
-                        .into(),
-                    ));
-
                     links.push(LinkInfo {
                         url: url.to_string(),
                         start_x,
@@ -76,18 +62,6 @@ impl LinkMap {
                 if url.starts_with("http://") || url.starts_with("https://") {
                     let start_x = x + (url_start as f64 * char_width);
                     let end_x = start_x + (url.len() as f64 * char_width);
-
-                    log(&Array::of1(
-                        &format!(
-                            "Detected link: {} at ({}, {}) to ({}, {})",
-                            url,
-                            start_x,
-                            y,
-                            end_x,
-                            y + line_height
-                        )
-                        .into(),
-                    ));
 
                     links.push(LinkInfo {
                         url: url.to_string(),
@@ -116,10 +90,6 @@ impl LinkMap {
                     && y >= link.y
                     && y <= link.y + link.line_height
                 {
-                    log(&Array::of2(
-                        &"MATCH found:".into(),
-                        &link.url.clone().into(),
-                    ));
                     return Some(link.url.clone());
                 }
             }

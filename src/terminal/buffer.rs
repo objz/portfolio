@@ -2,14 +2,14 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineType {
-    Normal,  // Regular output
-    Command, // User command with prompt
-    Output,  // Command output
-    Boot,    // Boot sequence lines
-    Typing,  // Typing animation lines
-    _Prompt, // Standalone prompt
-    _Error,  // Error messages
-    System,  // System messages
+    Normal,
+    Command,
+    Output,
+    Boot,
+    Typing,
+    _Prompt,
+    _Error,
+    System,
 }
 
 #[derive(Debug, Clone)]
@@ -32,7 +32,7 @@ impl BufferLine {
         }
     }
 
-    pub fn calculate_wrapping(&mut self, max_width: usize) {
+    pub fn calc_wrapping(&mut self, max_width: usize) {
         self.wrapped_lines.clear();
 
         let chars: Vec<char> = self.content.chars().collect();
@@ -71,7 +71,7 @@ impl BufferLine {
         }
     }
 
-    pub fn visual_line_count(&self) -> usize {
+    pub fn get_line_count(&self) -> usize {
         if self.wrapped_lines.is_empty() {
             1
         } else {
@@ -136,14 +136,14 @@ impl LineBuffer {
         let width_copy = width;
         let mut buffer = self.buffer.borrow_mut();
         for line in buffer.iter_mut() {
-            line.calculate_wrapping(width_copy);
+            line.calc_wrapping(width_copy);
         }
     }
 
     pub fn add_line(&self, content: String, line_type: LineType, color: Option<String>) {
         let mut line = BufferLine::new(content, line_type, color);
         let width = *self.terminal_width.borrow();
-        line.calculate_wrapping(width);
+        line.calc_wrapping(width);
 
         let mut buffer = self.buffer.borrow_mut();
         buffer.push_back(line);
@@ -180,7 +180,7 @@ impl LineBuffer {
         let mut total_visual_count = 0;
 
         for line in buffer.iter().rev() {
-            let line_visual_count = line.visual_line_count();
+            let line_visual_count = line.get_line_count();
             if total_visual_count + line_visual_count > max_visual_lines + state.scroll_offset {
                 break;
             }
@@ -218,7 +218,7 @@ impl LineBuffer {
         state.scroll_offset == 0
     }
 
-    pub fn auto_scroll_to_bottom(&self) {
+    pub fn auto_scroll_bottom(&self) {
         if self.should_auto_scroll() {
             self.reset_scroll();
         }
@@ -230,7 +230,7 @@ impl LineBuffer {
         let max_scroll = *self.max_scroll_lines.borrow();
         let terminal_height = *self.terminal_height.borrow();
 
-        let total_visual_lines: usize = buffer.iter().map(|line| line.visual_line_count()).sum();
+        let total_visual_lines: usize = buffer.iter().map(|line| line.get_line_count()).sum();
 
         let max_scroll_offset = if total_visual_lines > terminal_height {
             (total_visual_lines - terminal_height).min(max_scroll)
@@ -258,10 +258,6 @@ impl LineBuffer {
         } else {
             false
         }
-    }
-
-    fn _scroll_offset(&self) -> usize {
-        self.state.borrow().scroll_offset
     }
 }
 
@@ -310,7 +306,7 @@ pub fn set_input_mode(mode: InputMode) {
 }
 
 pub fn auto_scroll_to_bottom() {
-    LINE_BUFFER.with(|buffer| buffer.auto_scroll_to_bottom());
+    LINE_BUFFER.with(|buffer| buffer.auto_scroll_bottom());
 }
 
 pub fn scroll_up(lines: usize) -> bool {
@@ -319,10 +315,6 @@ pub fn scroll_up(lines: usize) -> bool {
 
 pub fn scroll_down(lines: usize) -> bool {
     LINE_BUFFER.with(|buffer| buffer.scroll_down(lines))
-}
-
-pub fn _get_scroll_offset() -> usize {
-    LINE_BUFFER.with(|buffer| buffer._scroll_offset())
 }
 
 pub fn reset_scroll() {

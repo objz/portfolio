@@ -76,16 +76,14 @@ impl Terminal {
         let _ = canvas_el.add_event_listener_with_callback_and_add_event_listener_options(
             "mousemove",
             mousemove_closure.as_ref().unchecked_ref(),
-            &web_sys::AddEventListenerOptions::new()
-                .capture(true)
-                .passive(true),
+            &web_sys::AddEventListenerOptions::new(),
         );
 
         mousemove_closure.forget();
     }
 
     pub fn get_current_prompt(&self) -> String {
-        let cwd = self.command_handler.get_current_directory();
+        let cwd = self.command_handler.get_working_dir();
         let display_path = if cwd == "/home/objz" {
             "~".to_string()
         } else if cwd.starts_with("/home/objz/") {

@@ -1,6 +1,5 @@
 use crate::commands::filesystem::{
-    get_node_at_path, get_node_at_path_mut, normalize_path, Node, CURRENT_PATH, CURRENT_USER,
-    FILESYSTEM,
+    get_node, get_node_mut, normalize_path, Node, CURRENT_PATH, CURRENT_USER, FILESYSTEM,
 };
 use std::collections::HashMap;
 
@@ -32,7 +31,7 @@ pub fn ls(args: &[&str]) -> String {
         current_path.clone()
     };
 
-    let node = match get_node_at_path(&filesystem, &path) {
+    let node = match get_node(&filesystem, &path) {
         Some(node) => node,
         None => return "ls: cannot access: No such file or directory".into(),
     };
@@ -98,11 +97,11 @@ pub fn cd(args: &[&str]) -> String {
 
         let new_path = normalize_path(args[0], &current_path);
 
-        match get_node_at_path(&filesystem, &new_path) {
+        match get_node(&filesystem, &new_path) {
             Some(Node::Directory { .. }) => new_path,
             Some(Node::Symlink { target, .. }) => {
                 let symlink_path = normalize_path(target, &current_path);
-                match get_node_at_path(&filesystem, &symlink_path) {
+                match get_node(&filesystem, &symlink_path) {
                     Some(Node::Directory { .. }) => symlink_path,
                     Some(_) => return format!("cd: {}: Not a directory", args[0]),
                     None => return format!("cd: {}: No such file or directory", args[0]),
@@ -142,7 +141,7 @@ pub fn cat(args: &[&str]) -> String {
     for &filename in args {
         let file_path = normalize_path(filename, &current_path);
 
-        match get_node_at_path(&filesystem, &file_path) {
+        match get_node(&filesystem, &file_path) {
             Some(Node::File { content, .. }) => {
                 output.push_str(content);
                 if args.len() > 1 && filename != args[args.len() - 1] {
@@ -153,10 +152,27 @@ pub fn cat(args: &[&str]) -> String {
                 output.push_str(&format!("cat: {}: Is a directory\n", filename));
             }
             Some(Node::Symlink { target, .. }) => {
-                output.push_str(&format!(
-                    "cat: {}: Symbolic link (points to {})\n",
-                    filename, target
-                ));
+                let target_path = normalize_path(target, &current_path);
+                match get_node(&filesystem, &target_path) {
+                    Some(Node::File { content, .. }) => {
+                        output.push_str(content);
+                        if args.len() > 1 && filename != args[args.len() - 1] {
+                            output.push('\n');
+                        }
+                    }
+                    Some(Node::Directory { .. }) => {
+                        output.push_str(&format!("cat: {}: Is a directory\n", filename));
+                    }
+                    Some(Node::Symlink { .. }) => {
+                        output.push_str(&format!(
+                            "cat: {}: Too many levels of symbolic links\n",
+                            filename
+                        ));
+                    }
+                    None => {
+                        output.push_str(&format!("cat: {}: No such file or directory\n", filename));
+                    }
+                }
             }
             None => {
                 output.push_str(&format!("cat: {}: No such file or directory\n", filename));
@@ -186,7 +202,7 @@ pub fn mkdir(args: &[&str]) -> String {
         let parent_path = &dir_path[..dir_path.len() - 1];
         let dir_name = &dir_path[dir_path.len() - 1];
 
-        let parent = match get_node_at_path_mut(&mut filesystem, parent_path) {
+        let parent = match get_node_mut(&mut filesystem, parent_path) {
             Some(Node::Directory { children, .. }) => children,
             Some(_) => {
                 return format!(
@@ -239,7 +255,7 @@ pub fn touch(args: &[&str]) -> String {
         let parent_path = &file_path[..file_path.len() - 1];
         let file_name = &file_path[file_path.len() - 1];
 
-        let parent = match get_node_at_path_mut(&mut filesystem, parent_path) {
+        let parent = match get_node_mut(&mut filesystem, parent_path) {
             Some(Node::Directory { children, .. }) => children,
             Some(_) => return format!("touch: cannot touch '{}': Not a directory", filename),
             None => {
@@ -306,7 +322,7 @@ pub fn rm(args: &[&str]) -> String {
         let parent_path = &file_path[..file_path.len() - 1];
         let file_name = &file_path[file_path.len() - 1];
 
-        let parent = match get_node_at_path_mut(&mut filesystem, parent_path) {
+        let parent = match get_node_mut(&mut filesystem, parent_path) {
             Some(Node::Directory { children, .. }) => children,
             Some(_) => {
                 if !force {
@@ -380,7 +396,7 @@ pub fn tree(args: &[&str]) -> String {
         normalize_path(args[0], &current_path)
     };
 
-    let start_node = match get_node_at_path(&filesystem, &start_path) {
+    let start_node = match get_node(&filesystem, &start_path) {
         Some(node) => node,
         None => return "tree: No such file or directory".into(),
     };
@@ -454,7 +470,7 @@ pub fn ln(args: &[&str]) -> String {
     let parent_path = &link_path[..link_path.len() - 1];
     let file_name = &link_path[link_path.len() - 1];
 
-    let parent = match get_node_at_path_mut(&mut filesystem, parent_path) {
+    let parent = match get_node_mut(&mut filesystem, parent_path) {
         Some(Node::Directory { children, .. }) => children,
         Some(_) => return format!("ln: cannot create link '{}': Not a directory", link_name),
         None => {
