@@ -49,24 +49,39 @@ pub fn uptime(_args: &[&str]) -> String {
 }
 
 pub fn neofetch(_args: &[&str]) -> String {
-    r#"                   -`                    objz@portfolio
-                  .o+`                   -----------------
-                 `ooo/                   OS: WASM Linux x86_64
-                `+oooo:                  Host: GitHub Pages
-               `+oooooo:                 Kernel: WASM 6.8.9
-               -+oooooo+:                Uptime: 17 days, 13 hours, 28 mins
-             `/:-:++oooo+:               Packages: 42 (rust), 13 (npm)
-            `/++++/+++++++:              Shell: objz-shell 3.0.0
-           `/++++++++++++++:             Resolution: 1920x1080
-          `/+++ooooooooo++++/            WM: tty1
-         ./ooosssso++osssssso+`          Theme: Dark
-        .oossssso-````/ossssss+`         Icons: ASCII Art Pack
-       -osssssso.      :ssssssso.        Terminal: objz-term
-      :osssssss/        +sssso+++.
-     /ossssssss/        +ssssooo/-       Memory: 521MiB / ∞GiB
-   `/ossssso+/:-        -:/+osssso+-     
-  `+sso+:-`                 `.-/+oso:    
- `++:.                           `-/+/   
- .`                                 `/   "#
-        .to_string()
+    let uptime_str = uptime(&[]);
+    let resolution_str = get_resolution();
+
+    format!(
+        r#"
+             .           
+             7:          objz@portfolio
+           .7J^          -----------------
+         .~?JJ:          OS: WASM Linux x86_64
+       :!?JJJ~           Host: GitHub Pages
+     ^7JJJJ7:            Kernel: WASM 6.8.9
+   :7JJJJ7:   .^         Uptime: {}
+  :?J?J?:     :J7.       Packages: 23 (rust),
+  ~J?J?.      !JJ!       Shell: objz-shell
+  .7JJ!     .7J?J?       Resolution: {}
+    :~7:  .~?J?J?^       WM: tty1
+        .~?JJJ?!:        Theme: Dark
+       :?JJJ?!:          Icons: ASCII Art Pack
+      .?JJ7^.            Terminal: objz-term
+      :JJ~               Memory: 521MiB / ∞ GiB
+       7!                
+                       
+"#,
+        uptime_str, resolution_str
+    )
+}
+
+fn get_resolution() -> String {
+    if let Some(window) = web_sys::window() {
+        let width = window.inner_width().unwrap().as_f64().unwrap() as i32;
+        let height = window.inner_height().unwrap().as_f64().unwrap() as i32;
+        format!("{}x{}", width, height)
+    } else {
+        "1920x1080".to_string()
+    }
 }
