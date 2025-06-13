@@ -355,25 +355,33 @@ impl InputHandler {
         if !trimmed_input.is_empty() {
             let (result, _directory_changed) = processor.handle(trimmed_input);
 
-            match result.as_str() {
-                "CLEAR_SCREEN" => {
-                    buffer::clear_buffer();
-                    Self::handle_input(terminal, hidden_input);
-                }
-                "SYSTEM_PANIC" => {
-                    let terminal_clone = terminal.clone();
-                    let hidden_input_clone = hidden_input.clone();
-                    spawn_local(async move {
-                        panic::trigger(&terminal_clone).await;
-                        Self::handle_input(&terminal_clone, &hidden_input_clone);
-                    });
-                }
-                _ => {
-                    if !result.is_empty() {
-                        buffer::add_output_lines(&result, None);
+            // Extract the String from CommandResult::Output before treating it like text
+            if let crate::commands::processor::CommandResult::Output(s) = result {
+                match s.as_str() {
+                    "CLEAR_SCREEN" => {
+                        buffer::clear_buffer();
+                        Self::handle_input(terminal, hidden_input);
                     }
-                    Self::handle_input(terminal, hidden_input);
+                    "SYSTEM_PANIC" => {
+                        let terminal_clone = terminal.clone();
+                        let hidden_input_clone = hidden_input.clone();
+                        spawn_local(async move {
+                            panic::trigger(&terminal_clone).await;
+                            Self::handle_input(&terminal_clone, &hidden_input_clone);
+                        });
+                    }
+                    other if !other.is_empty() => {
+                        buffer::add_output_lines(other, None);
+                        Self::handle_input(terminal, hidden_input);
+                    }
+                    _ => {
+                        // empty output: just redraw prompt
+                        Self::handle_input(terminal, hidden_input);
+                    }
                 }
+            } else {
+                // Animated command: redraw prompt (animation is handled elsewhere)
+                Self::handle_input(terminal, hidden_input);
             }
         } else {
             Self::handle_input(terminal, hidden_input);

@@ -38,7 +38,20 @@ pub fn sudo(args: &[&str]) -> String {
     if args.is_empty() {
         return "sudo: command required".into();
     }
-    "Sudo access denied.".into()
+
+    let valid_commands = vec![
+        "clear", "history", "echo", "date", "uptime", "neofetch", "ls", "cd", "cat", "pwd", "tree",
+        "mkdir", "touch", "rm", "uname", "ln", "ll", "help", "sudo", "cowsay", "sl", "lolcat",
+        "calc",
+    ];
+
+    let command = args[0];
+
+    if valid_commands.contains(&command) {
+        "sudo: access denied.".into()
+    } else {
+        format!("zsh: command not found: {}", command)
+    }
 }
 
 pub fn cowsay(args: &[&str]) -> String {
