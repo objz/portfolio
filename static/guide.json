@@ -216,17 +216,13 @@
           "match": "^readme\\s+[^\\s]+"
         },
         {
-          "label": "open it in your browser",
-          "match": "^open\\s+[^\\s]+"
-        },
-        {
           "label": "return home",
           "match": "^cd\\s*(~|)$"
         }
       ],
       "hints": [
         "try: project reponame (use tab)",
-        "try: readme reponame, open reponame, then cd"
+        "try: readme reponame, then cd"
       ],
       "funFact": "these commands hit the github api in real time. the project command is like man pages: a concept from 1971 where every unix tool had a manual."
     },
@@ -476,7 +472,7 @@
       ],
       "hints": [
         "try: nvim about.txt",
-        "inside: i to type, Esc to stop, :wq to save and quit"
+        "inside: i to type, Ctrl+Esc to exit insert mode, :wq to save and quit"
       ],
       "funFact": "vim uses modal editing: normal mode for navigation, insert mode for typing. designed in 1976 for terminals so slow that every keystroke had to count."
     },

@@ -401,28 +401,38 @@ impl TerminalRenderer {
         self.setup_font();
 
         let default_color = self.get_color_value(color.unwrap_or("#ffffff"));
-        let mut current_color = default_color.clone();
+        let mut current_fg = default_color.clone();
+        let mut current_bg: Option<String> = None;
+        let mut bg_offset = 4.0; // Default offset for background rectangles
         let mut current_x = x;
         let mut segment = String::new();
-
-        let flush_segment =
-            |renderer: &Self, segment: &mut String, x: &mut f64, y: f64, color: &str| {
-                if segment.is_empty() {
-                    return;
-                }
-
-                renderer.set_fill_color(color);
-                let _ = renderer.context.fill_text(segment, *x, y);
-                *x += segment.chars().count() as f64 * renderer.char_width;
-                segment.clear();
-            };
 
         let chars: Vec<char> = text.chars().collect();
         let mut i = 0;
 
         while i < chars.len() {
             if chars[i] == '\u{1b}' && i + 1 < chars.len() && chars[i + 1] == '[' {
-                flush_segment(self, &mut segment, &mut current_x, y, &current_color);
+                // Flush current segment before processing escape code
+                if !segment.is_empty() {
+                    let seg_width = segment.chars().count() as f64 * self.char_width;
+                    
+                    // Draw background if set
+                    if let Some(ref bg) = current_bg {
+                        self.set_fill_color(bg);
+                        let _ = self.context.fill_rect(
+                            current_x,
+                            y - self.line_height + bg_offset,
+                            seg_width,
+                            self.line_height,
+                        );
+                    }
+                    
+                    // Draw foreground text
+                    self.set_fill_color(&current_fg);
+                    let _ = self.context.fill_text(&segment, current_x, y);
+                    current_x += seg_width;
+                    segment.clear();
+                }
 
                 i += 2;
                 let mut code_buf = String::new();
@@ -432,7 +442,10 @@ impl TerminalRenderer {
                 }
 
                 if i < chars.len() && chars[i] == 'm' {
-                    current_color = self.resolve_ansi_color(&code_buf, &default_color);
+                    let (fg, bg, offset) = self.resolve_ansi_colors(&code_buf, &default_color, bg_offset);
+                    current_fg = fg;
+                    current_bg = bg;
+                    bg_offset = offset;
                 }
             } else {
                 segment.push(chars[i]);
@@ -441,46 +454,105 @@ impl TerminalRenderer {
             i += 1;
         }
 
-        flush_segment(self, &mut segment, &mut current_x, y, &current_color);
+        // Flush remaining segment
+        if !segment.is_empty() {
+            let seg_width = segment.chars().count() as f64 * self.char_width;
+            
+            // Draw background if set
+            if let Some(ref bg) = current_bg {
+                self.set_fill_color(bg);
+                let _ = self.context.fill_rect(
+                    current_x,
+                    y - self.line_height + bg_offset,
+                    seg_width,
+                    self.line_height,
+                );
+            }
+            
+            // Draw foreground text
+            self.set_fill_color(&current_fg);
+            let _ = self.context.fill_text(&segment, current_x, y);
+        }
+        
         self.context.restore();
     }
 
-    fn resolve_ansi_color(&self, codes: &str, default_color: &str) -> String {
+    /// Resolves ANSI color codes, returning (foreground, background, bg_offset)
+    fn resolve_ansi_colors(&self, codes: &str, default_color: &str, current_offset: f64) -> (String, Option<String>, f64) {
         if codes.is_empty() {
-            return default_color.to_string();
+            return (default_color.to_string(), None, current_offset);
         }
 
         let parts: Vec<&str> = codes.split(';').collect();
         let mut index = 0usize;
-        let mut current = default_color.to_string();
+        let mut fg = default_color.to_string();
+        let mut bg: Option<String> = None;
+        let mut offset = current_offset;
 
         while index < parts.len() {
             let code = parts[index].parse::<i32>().unwrap_or(-1);
 
             match code {
-                0 | 39 => current = default_color.to_string(),
-                30 => current = "#000000".to_string(),
-                31 => current = "#ff5555".to_string(),
-                32 => current = "#50fa7b".to_string(),
-                33 => current = "#f1fa8c".to_string(),
-                34 => current = "#6272a4".to_string(),
-                35 => current = "#ff79c6".to_string(),
-                36 => current = "#8be9fd".to_string(),
-                37 => current = "#f8f8f2".to_string(),
-                90 => current = "#888888".to_string(),
-                91 => current = "#ff6e6e".to_string(),
-                92 => current = "#69ff94".to_string(),
-                93 => current = "#ffffa5".to_string(),
-                94 => current = "#8094d4".to_string(),
-                95 => current = "#ff92df".to_string(),
-                96 => current = "#a4ffff".to_string(),
-                97 => current = "#ffffff".to_string(),
+                // Reset
+                0 => {
+                    fg = default_color.to_string();
+                    bg = None;
+                    offset = 4.0; // Reset to default offset
+                }
+                99 => offset = 16.0,
+                // Foreground colors (30-37, 90-97)
+                39 => fg = default_color.to_string(),
+                30 => fg = "#000000".to_string(),
+                31 => fg = "#ff5555".to_string(),
+                32 => fg = "#50fa7b".to_string(),
+                33 => fg = "#f1fa8c".to_string(),
+                34 => fg = "#6272a4".to_string(),
+                35 => fg = "#ff79c6".to_string(),
+                36 => fg = "#8be9fd".to_string(),
+                37 => fg = "#f8f8f2".to_string(),
+                90 => fg = "#888888".to_string(),
+                91 => fg = "#ff6e6e".to_string(),
+                92 => fg = "#69ff94".to_string(),
+                93 => fg = "#ffffa5".to_string(),
+                94 => fg = "#8094d4".to_string(),
+                95 => fg = "#ff92df".to_string(),
+                96 => fg = "#a4ffff".to_string(),
+                97 => fg = "#ffffff".to_string(),
+                // Background colors (40-47, 100-107)
+                49 => bg = None,
+                40 => bg = Some("#000000".to_string()),
+                41 => bg = Some("#ff5555".to_string()),
+                42 => bg = Some("#50fa7b".to_string()),
+                43 => bg = Some("#f1fa8c".to_string()),
+                44 => bg = Some("#6272a4".to_string()),
+                45 => bg = Some("#ff79c6".to_string()),
+                46 => bg = Some("#8be9fd".to_string()),
+                47 => bg = Some("#f8f8f2".to_string()),
+                100 => bg = Some("#888888".to_string()),
+                101 => bg = Some("#ff6e6e".to_string()),
+                102 => bg = Some("#69ff94".to_string()),
+                103 => bg = Some("#ffffa5".to_string()),
+                104 => bg = Some("#8094d4".to_string()),
+                105 => bg = Some("#ff92df".to_string()),
+                106 => bg = Some("#a4ffff".to_string()),
+                107 => bg = Some("#ffffff".to_string()),
+                // 24-bit foreground color
                 38 => {
                     if index + 4 < parts.len() && parts[index + 1] == "2" {
                         let r = parts[index + 2].parse::<u8>().unwrap_or(255);
                         let g = parts[index + 3].parse::<u8>().unwrap_or(255);
                         let b = parts[index + 4].parse::<u8>().unwrap_or(255);
-                        current = format!("#{:02x}{:02x}{:02x}", r, g, b);
+                        fg = format!("#{:02x}{:02x}{:02x}", r, g, b);
+                        index += 4;
+                    }
+                }
+                // 24-bit background color
+                48 => {
+                    if index + 4 < parts.len() && parts[index + 1] == "2" {
+                        let r = parts[index + 2].parse::<u8>().unwrap_or(255);
+                        let g = parts[index + 3].parse::<u8>().unwrap_or(255);
+                        let b = parts[index + 4].parse::<u8>().unwrap_or(255);
+                        bg = Some(format!("#{:02x}{:02x}{:02x}", r, g, b));
                         index += 4;
                     }
                 }
@@ -490,7 +562,7 @@ impl TerminalRenderer {
             index += 1;
         }
 
-        current
+        (fg, bg, offset)
     }
 
     pub fn draw_boot_line(&self, text: &str, y: f64, color: Option<&str>) {

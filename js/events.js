@@ -149,7 +149,21 @@ export class EventManager {
   }
 
   onKeyDown(event) {
-    if (document.body.classList.contains("editor-active")) {
+    const editorActive = document.body.classList.contains("editor-active");
+
+    // Always ensure hidden input has focus when terminal is focused or editor is active
+    // This is critical for the Rust keydown handler to receive events
+    if (this.sceneManager.hiddenInput) {
+      const activeElement = document.activeElement;
+      if (
+        activeElement !== this.sceneManager.hiddenInput &&
+        (this.sceneManager.terminalFocused || editorActive)
+      ) {
+        this.sceneManager.hiddenInput.focus();
+      }
+    }
+
+    if (editorActive) {
       return;
     }
 
@@ -159,13 +173,6 @@ export class EventManager {
       !event.defaultPrevented
     ) {
       window.dispatchEvent(new CustomEvent("terminalBlur"));
-    }
-
-    if (this.sceneManager.terminalFocused && this.sceneManager.hiddenInput) {
-      const activeElement = document.activeElement;
-      if (activeElement !== this.sceneManager.hiddenInput) {
-        this.sceneManager.hiddenInput.focus();
-      }
     }
 
     if (this.sceneManager.animationManager) {
