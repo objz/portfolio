@@ -1,5 +1,8 @@
 use crate::ascii::AsciiArt;
-use crate::commands::options::{self, OptionSpec};
+use crate::commands::{
+    core,
+    options::{self, OptionSpec},
+};
 use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
@@ -31,8 +34,6 @@ pub fn clear(args: &[&str]) -> String {
     "CLEAR_SCREEN".to_string()
 }
 
-use super::commands;
-
 pub fn echo(args: &[&str]) -> String {
     let options = match options::parse("echo", args, OptionSpec::new(&['n'], &["help"])) {
         Ok(options) => options,
@@ -60,7 +61,7 @@ pub fn echo(args: &[&str]) -> String {
 fn expand_variable(arg: &str) -> String {
     match arg {
         "$HOME" => "/home/objz".to_string(),
-        "$PWD" => commands::pwd(&[]),
+        "$PWD" => core::pwd(&[]),
         "$USER" => "objz".to_string(),
         "$SHELL" => "/bin/zsh".to_string(),
         "$HOSTNAME" => "portfolio".to_string(),

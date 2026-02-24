@@ -1,14 +1,14 @@
 use crate::terminal::Terminal;
 use wasm_bindgen_futures::spawn_local;
 
-pub mod boot;
+pub mod sequence;
 
 impl Terminal {
     pub async fn init_boot(&self) {
         self.clear_output();
-        boot::boot(self).await;
-        boot::logo(self).await;
-        boot::login(self).await;
+        sequence::boot(self).await;
+        sequence::logo(self).await;
+        sequence::login(self).await;
         self.prepare_for_input();
 
         spawn_local(async {

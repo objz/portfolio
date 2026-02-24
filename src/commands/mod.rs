@@ -1,4 +1,4 @@
-pub mod commands;
+pub mod core;
 pub mod filesystem;
 pub mod misc;
 pub mod options;

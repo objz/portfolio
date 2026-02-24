@@ -8,13 +8,15 @@ use crate::{
     terminal::renderer::{LineOptions, TerminalRenderer},
 };
 
-use super::{commands, filesystem, misc};
+use super::{core, filesystem, misc};
+
+// type alias for async command handlers
+pub type AnimatedCommand =
+    Box<dyn Fn(TerminalRenderer) -> Pin<Box<dyn Future<Output = ()> + 'static>> + 'static>;
 
 pub enum CommandResult {
     Output(String),
-    Animated(
-        Box<dyn Fn(TerminalRenderer) -> Pin<Box<dyn Future<Output = ()> + 'static>> + 'static>,
-    ),
+    Animated(AnimatedCommand),
 }
 
 #[derive(Clone)]
@@ -30,7 +32,7 @@ impl CommandHandler {
     }
 
     pub fn get_working_dir(&self) -> String {
-        commands::pwd(&[])
+        core::pwd(&[])
     }
 
     pub fn handle(&mut self, input: &str) -> (CommandResult, bool) {
@@ -76,7 +78,7 @@ impl CommandHandler {
             last_success = success;
 
             if let Some(redirection) = segment.redirection {
-                match commands::write_output(&redirection.path, &output, redirection.append) {
+                match core::write_output(&redirection.path, &output, redirection.append) {
                     Ok(()) => output.clear(),
                     Err(error) => {
                         output = error;
@@ -168,26 +170,26 @@ impl CommandHandler {
             "hostname" => CommandResult::Output(system::hostname(&args)),
             "whoami" => CommandResult::Output(system::whoami(&args)),
 
-            "ls" => CommandResult::Output(commands::ls(&args)),
-            "cd" => CommandResult::Output(commands::cd(&args)),
+            "ls" => CommandResult::Output(core::ls(&args)),
+            "cd" => CommandResult::Output(core::cd(&args)),
             "cat" => {
                 if args.is_empty() {
                     CommandResult::Output(stdin_owned.clone().unwrap_or_default())
                 } else {
-                    CommandResult::Output(commands::cat(&args))
+                    CommandResult::Output(core::cat(&args))
                 }
             }
-            "pwd" => CommandResult::Output(commands::pwd(&args)),
-            "tree" => CommandResult::Output(commands::tree(&args)),
-            "mkdir" => CommandResult::Output(commands::mkdir(&args)),
-            "touch" => CommandResult::Output(commands::touch(&args)),
-            "rm" => CommandResult::Output(commands::rm(&args)),
-            "uname" => CommandResult::Output(commands::uname(&args)),
-            "ln" => CommandResult::Output(commands::ln(&args)),
-            "cp" => CommandResult::Output(commands::cp(&args)),
-            "mv" => CommandResult::Output(commands::mv(&args)),
-            "nvim" => CommandResult::Output(commands::nvim(&args)),
-            "ll" => CommandResult::Output(commands::ls(&["-la"])),
+            "pwd" => CommandResult::Output(core::pwd(&args)),
+            "tree" => CommandResult::Output(core::tree(&args)),
+            "mkdir" => CommandResult::Output(core::mkdir(&args)),
+            "touch" => CommandResult::Output(core::touch(&args)),
+            "rm" => CommandResult::Output(core::rm(&args)),
+            "uname" => CommandResult::Output(core::uname(&args)),
+            "ln" => CommandResult::Output(core::ln(&args)),
+            "cp" => CommandResult::Output(core::cp(&args)),
+            "mv" => CommandResult::Output(core::mv(&args)),
+            "nvim" => CommandResult::Output(core::nvim(&args)),
+            "ll" => CommandResult::Output(core::ls(&["-la"])),
 
             "help" => CommandResult::Output(misc::help(&args)),
             "sudo" => CommandResult::Output(misc::sudo(&args)),
