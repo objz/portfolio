@@ -182,7 +182,7 @@ fn set_editor_active_class(active: bool) {
 
     let current = body.class_name();
     let mut classes: Vec<&str> = current.split_whitespace().collect();
-    let has_flag = classes.iter().any(|name| *name == "editor-active");
+    let has_flag = classes.contains(&"editor-active");
 
     if active && !has_flag {
         classes.push("editor-active");
@@ -278,7 +278,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
     let key = event.key();
     let key_str = key.as_str();
 
-    // Handle Ctrl+R for redo
     if event.ctrl_key() && key_str.eq_ignore_ascii_case("r") {
         if redo(state) {
             state.message = "redone".to_string();
@@ -288,7 +287,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
         return KeyAction::Continue;
     }
 
-    // Handle Escape to cancel pending operation
     if key_str == "Escape" {
         state.pending_op = PendingOp::None;
         state.count = None;
@@ -296,7 +294,7 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
         return KeyAction::Continue;
     }
 
-    // Accumulate count prefix (1-9 start, 0-9 continue)
+    // Count prefix (1-9 start, 0-9 continue)
     if let Some(digit) = key_str.chars().next().filter(|c| c.is_ascii_digit()) {
         if digit != '0' || state.count.is_some() {
             let current = state.count.unwrap_or(0);
@@ -307,13 +305,12 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
 
     let count = state.count.take().unwrap_or(1);
 
-    // Handle operator-pending mode (d, c, y followed by motion)
+    // Operator-pending mode (d, c, y followed by motion)
     if state.pending_op != PendingOp::None {
         let op = state.pending_op;
         state.pending_op = PendingOp::None;
 
         match key_str {
-            // dd, cc, yy - operate on whole line(s)
             "d" if op == PendingOp::Delete => delete_lines(state, count),
             "c" if op == PendingOp::Change => {
                 delete_lines(state, count);
@@ -322,23 +319,19 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
             "y" if op == PendingOp::Yank => yank_lines(state, count),
 
-            // Motions with operators
             "w" => operate_word_forward(state, op, count),
             "e" => operate_word_end(state, op, count),
             "b" => operate_word_backward(state, op, count),
             "0" | "Home" => operate_to_col(state, op, 0),
             "$" | "End" => operate_to_col(state, op, char_len(&state.lines[state.cursor_row])),
             "g" => {
-                // dgg, cgg, ygg - operate to start of file
                 operate_to_line(state, op, 0);
             }
             "G" => {
-                // dG, cG, yG - operate to end of file
                 operate_to_line(state, op, state.lines.len().saturating_sub(1));
             }
             "i" => {
-                // diw, daw, etc. - inner/around word (simplified: just word)
-                // We'll handle this as word under cursor
+                // TODO: diw, daw text objects
             }
             _ => {
                 state.message = "Unknown motion".to_string();
@@ -353,9 +346,7 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
         return KeyAction::Continue;
     }
 
-    // Normal mode commands
     match key_str {
-        // Basic movement
         "h" | "ArrowLeft" => {
             for _ in 0..count {
                 move_left(state);
@@ -377,7 +368,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
 
-        // Line position
         "0" | "Home" => state.cursor_col = 0,
         "^" => move_to_first_non_blank(state),
         "$" | "End" => {
@@ -386,7 +376,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
                 .max(0)
         }
 
-        // Word motions
         "w" => {
             for _ in 0..count {
                 move_word_forward(state);
@@ -418,9 +407,7 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
 
-        // Line navigation
         "g" => {
-            // gg - go to first line (or line N with count)
             state.cursor_row = count
                 .saturating_sub(1)
                 .min(state.lines.len().saturating_sub(1));
@@ -429,7 +416,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
                 .min(char_len(&state.lines[state.cursor_row]));
         }
         "G" => {
-            // G - go to last line (or line N with count)
             if count > 1 {
                 state.cursor_row = (count - 1).min(state.lines.len().saturating_sub(1));
             } else {
@@ -440,7 +426,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
                 .min(char_len(&state.lines[state.cursor_row]));
         }
 
-        // Insert modes
         "i" => {
             save_undo(state);
             state.mode = EditorMode::Insert;
@@ -483,7 +468,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             state.message = "-- INSERT -- (Ctrl+Esc to exit)".to_string();
         }
 
-        // Delete/change/yank operators
         "d" => {
             state.pending_op = PendingOp::Delete;
             state.count = Some(count);
@@ -497,7 +481,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             state.count = Some(count);
         }
 
-        // Single char operations
         "x" => {
             save_undo(state);
             for _ in 0..count {
@@ -514,15 +497,12 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
         "r" => {
-            // r is handled specially - need next char
             state.message = "r: replace char".to_string();
             state.pending_op = PendingOp::None;
-            // We'll use count field to signal replace mode
             state.count = Some(count);
             state.register = "r".to_string();
         }
         "s" => {
-            // s - substitute char (delete and insert)
             save_undo(state);
             for _ in 0..count {
                 delete_under_cursor(state);
@@ -531,7 +511,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             state.message = "-- INSERT -- (Ctrl+Esc to exit)".to_string();
         }
         "S" | "C" => {
-            // S/C - change whole line / change to end of line
             save_undo(state);
             if key_str == "S" {
                 state.lines[state.cursor_row].clear();
@@ -546,7 +525,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             state.message = "-- INSERT -- (Ctrl+Esc to exit)".to_string();
         }
         "D" => {
-            // D - delete to end of line
             save_undo(state);
             let line = &mut state.lines[state.cursor_row];
             let pos = byte_index(line, state.cursor_col);
@@ -558,9 +536,7 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
                 .min(char_len(&state.lines[state.cursor_row]).saturating_sub(1));
         }
 
-        // Paste
         "p" => {
-            // Paste after cursor
             if !state.register.is_empty() {
                 save_undo(state);
                 for _ in 0..count {
@@ -569,7 +545,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
         "P" => {
-            // Paste before cursor
             if !state.register.is_empty() {
                 save_undo(state);
                 for _ in 0..count {
@@ -578,7 +553,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
 
-        // Undo/Redo
         "u" => {
             if undo(state) {
                 state.message = "undone".to_string();
@@ -587,9 +561,6 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
 
-        // Ctrl+R for redo is handled separately since we need ctrl check
-
-        // Join lines
         "J" => {
             save_undo(state);
             for _ in 0..count {
@@ -597,14 +568,13 @@ fn handle_normal_mode(state: &mut EditorState, event: &KeyboardEvent) -> KeyActi
             }
         }
 
-        // Command mode
         ":" => {
             state.mode = EditorMode::Command;
             state.command_line.clear();
         }
 
         _ => {
-            // Check if this is a replacement char after 'r'
+            // Handle replacement char after 'r'
             if state.register == "r" && key_str.chars().count() == 1 {
                 if let Some(ch) = key_str.chars().next() {
                     save_undo(state);
@@ -907,20 +877,17 @@ fn is_big_word_char(ch: char) -> bool {
     !ch.is_whitespace()
 }
 
-// Move to first non-blank character
 fn move_to_first_non_blank(state: &mut EditorState) {
     let line = &state.lines[state.cursor_row];
     state.cursor_col = line.chars().position(|c| !c.is_whitespace()).unwrap_or(0);
 }
 
-// Word forward (w)
 fn move_word_forward(state: &mut EditorState) {
     let line = &state.lines[state.cursor_row];
     let chars: Vec<char> = line.chars().collect();
     let len = chars.len();
 
     if state.cursor_col >= len {
-        // Move to next line
         if state.cursor_row + 1 < state.lines.len() {
             state.cursor_row += 1;
             state.cursor_col = 0;
@@ -931,7 +898,6 @@ fn move_word_forward(state: &mut EditorState) {
 
     let mut col = state.cursor_col;
 
-    // Skip current word
     if col < len && is_word_char(chars[col]) {
         while col < len && is_word_char(chars[col]) {
             col += 1;
@@ -942,7 +908,6 @@ fn move_word_forward(state: &mut EditorState) {
         }
     }
 
-    // Skip whitespace
     while col < len && is_whitespace(chars[col]) {
         col += 1;
     }
@@ -956,7 +921,6 @@ fn move_word_forward(state: &mut EditorState) {
     }
 }
 
-// Word forward big (W)
 fn move_word_forward_big(state: &mut EditorState) {
     let line = &state.lines[state.cursor_row];
     let chars: Vec<char> = line.chars().collect();
@@ -973,12 +937,10 @@ fn move_word_forward_big(state: &mut EditorState) {
 
     let mut col = state.cursor_col;
 
-    // Skip non-whitespace
     while col < len && is_big_word_char(chars[col]) {
         col += 1;
     }
 
-    // Skip whitespace
     while col < len && is_whitespace(chars[col]) {
         col += 1;
     }
@@ -992,7 +954,6 @@ fn move_word_forward_big(state: &mut EditorState) {
     }
 }
 
-// Word end (e)
 fn move_word_end(state: &mut EditorState) {
     let line = &state.lines[state.cursor_row];
     let chars: Vec<char> = line.chars().collect();
@@ -1009,12 +970,10 @@ fn move_word_end(state: &mut EditorState) {
 
     let mut col = state.cursor_col + 1;
 
-    // Skip whitespace
     while col < len && is_whitespace(chars[col]) {
         col += 1;
     }
 
-    // Move to end of word
     if col < len && is_word_char(chars[col]) {
         while col + 1 < len && is_word_char(chars[col + 1]) {
             col += 1;
@@ -1028,7 +987,6 @@ fn move_word_end(state: &mut EditorState) {
     state.cursor_col = col.min(len.saturating_sub(1));
 }
 
-// Word end big (E)
 fn move_word_end_big(state: &mut EditorState) {
     let line = &state.lines[state.cursor_row];
     let chars: Vec<char> = line.chars().collect();

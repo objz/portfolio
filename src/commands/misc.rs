@@ -31,7 +31,7 @@ pub fn sudo(args: &[&str]) -> String {
 }
 
 pub fn cowsay(args: &[&str]) -> String {
-    if args.iter().any(|arg| *arg == "--help") {
+    if args.contains(&"--help") {
         return "Usage: cowsay <message>\nExample: cowsay hello world".to_string();
     }
 

@@ -345,7 +345,7 @@ pub fn render_markdown_to_terminal(markdown: &str) -> String {
                 TagEnd::List(_) => {
                     list_stack.pop();
                     if !output.ends_with("\n\n") {
-                        output.push_str("\n");
+                        output.push('\n');
                     }
                 }
                 TagEnd::Item => {
@@ -363,7 +363,7 @@ pub fn render_markdown_to_terminal(markdown: &str) -> String {
                 TagEnd::BlockQuote(_) => {
                     in_blockquote = false;
                     if !output.ends_with("\n\n") {
-                        output.push_str("\n");
+                        output.push('\n');
                     }
                 }
                 TagEnd::Link => {
@@ -426,11 +426,11 @@ pub fn render_markdown_to_terminal(markdown: &str) -> String {
                 output.push_str("---\n");
             }
             Event::Html(html) => {
-                let text = html.replace('<', " ").replace('>', " ");
+                let text = html.replace(['<', '>'], " ");
                 push_text(text.trim(), &mut output, &mut link_stack);
             }
             Event::InlineHtml(html) => {
-                let text = html.replace('<', " ").replace('>', " ");
+                let text = html.replace(['<', '>'], " ");
                 push_text(text.trim(), &mut output, &mut link_stack);
             }
             Event::FootnoteReference(name) => {

@@ -21,7 +21,7 @@ use terminal::Terminal;
 static TERMINAL_READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
-    static TERMINAL_INSTANCE: RefCell<Option<Terminal>> = RefCell::new(None);
+    static TERMINAL_INSTANCE: RefCell<Option<Terminal>> = const { RefCell::new(None) };
 }
 
 #[wasm_bindgen(start)]

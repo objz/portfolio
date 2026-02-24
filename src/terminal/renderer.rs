@@ -212,7 +212,7 @@ impl TerminalRenderer {
         if input_chars <= first_line_capacity {
             1
         } else {
-            1 + (input_chars - first_line_capacity + max_chars - 1) / max_chars
+            1 + (input_chars - first_line_capacity).div_ceil(max_chars)
         }
     }
 
@@ -370,7 +370,7 @@ impl TerminalRenderer {
                         current_x + (potential_url.len() as f64 * self.char_width),
                         y + self.line_height - 2.0,
                     );
-                    let _ = self.context.stroke();
+                    self.context.stroke();
                     self.context.restore();
 
                     current_x += potential_url.len() as f64 * self.char_width;
@@ -416,10 +416,9 @@ impl TerminalRenderer {
                 if !segment.is_empty() {
                     let seg_width = segment.chars().count() as f64 * self.char_width;
                     
-                    // Draw background if set
                     if let Some(ref bg) = current_bg {
                         self.set_fill_color(bg);
-                        let _ = self.context.fill_rect(
+                        self.context.fill_rect(
                             current_x,
                             y - self.line_height + bg_offset,
                             seg_width,
@@ -427,7 +426,6 @@ impl TerminalRenderer {
                         );
                     }
                     
-                    // Draw foreground text
                     self.set_fill_color(&current_fg);
                     let _ = self.context.fill_text(&segment, current_x, y);
                     current_x += seg_width;
@@ -454,14 +452,12 @@ impl TerminalRenderer {
             i += 1;
         }
 
-        // Flush remaining segment
         if !segment.is_empty() {
             let seg_width = segment.chars().count() as f64 * self.char_width;
             
-            // Draw background if set
             if let Some(ref bg) = current_bg {
                 self.set_fill_color(bg);
-                let _ = self.context.fill_rect(
+                self.context.fill_rect(
                     current_x,
                     y - self.line_height + bg_offset,
                     seg_width,
@@ -469,7 +465,6 @@ impl TerminalRenderer {
                 );
             }
             
-            // Draw foreground text
             self.set_fill_color(&current_fg);
             let _ = self.context.fill_text(&segment, current_x, y);
         }

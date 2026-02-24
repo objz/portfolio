@@ -51,13 +51,12 @@ pub fn parse(command: &str, args: &[&str], spec: OptionSpec) -> Result<ParsedOpt
             continue;
         }
 
-        if arg.starts_with("--") {
-            if arg.len() == 2 {
+        if let Some(long_name) = arg.strip_prefix("--") {
+            if long_name.is_empty() {
                 parse_options = false;
                 continue;
             }
 
-            let long_name = &arg[2..];
             if spec.long_flags.contains(&long_name) {
                 parsed.long_flags.insert(long_name.to_string());
             } else {

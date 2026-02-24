@@ -12,8 +12,8 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{window, CustomEvent, HtmlInputElement, KeyboardEvent};
 
 thread_local! {
-    static CURRENT_INPUT: RefCell<String> = RefCell::new(String::new());
-    static IS_FOCUSED: RefCell<bool> = RefCell::new(false);
+    static CURRENT_INPUT: RefCell<String> = const { RefCell::new(String::new()) };
+    static IS_FOCUSED: RefCell<bool> = const { RefCell::new(false) };
     static AUTOCOMPLETE: RefCell<AutoComplete> = RefCell::new(AutoComplete::new());
 }
 

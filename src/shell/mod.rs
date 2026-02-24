@@ -169,7 +169,6 @@ fn split_pipeline(segment: &str) -> Result<Vec<Vec<String>>, String> {
     let mut commands = Vec::new();
     let mut current = String::new();
 
-    let mut chars = segment.chars().peekable();
     let mut in_single = false;
     let mut in_double = false;
     let mut escaped = false;
@@ -191,7 +190,7 @@ fn split_pipeline(segment: &str) -> Result<Vec<Vec<String>>, String> {
         Ok(())
     };
 
-    while let Some(ch) = chars.next() {
+    for ch in segment.chars() {
         if escaped {
             current.push(ch);
             escaped = false;
