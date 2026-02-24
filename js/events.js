@@ -95,6 +95,20 @@ export class EventManager {
   }
 
   onClick(event) {
+    if (document.body.classList.contains("editor-active")) {
+      if (this.sceneManager.terminalFocused) {
+        window.dispatchEvent(new CustomEvent("terminalFocus"));
+      }
+      return;
+    }
+
+    if (this.isOverlayInteraction(event.target)) {
+      if (this.sceneManager.terminalFocused) {
+        window.dispatchEvent(new CustomEvent("terminalFocus"));
+      }
+      return;
+    }
+
     if (!this.sceneManager.camera || !this.sceneManager.modelManager) return;
 
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -126,9 +140,32 @@ export class EventManager {
     }
   }
 
+  isOverlayInteraction(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    return Boolean(target.closest("#guide-panel, #top-bar, #audio-btn, #portfolio-title"));
+  }
+
   onKeyDown(event) {
-    if (event.code === "Escape" && this.sceneManager.terminalFocused) {
+    if (document.body.classList.contains("editor-active")) {
+      return;
+    }
+
+    if (
+      event.code === "Escape" &&
+      this.sceneManager.terminalFocused &&
+      !event.defaultPrevented
+    ) {
       window.dispatchEvent(new CustomEvent("terminalBlur"));
+    }
+
+    if (this.sceneManager.terminalFocused && this.sceneManager.hiddenInput) {
+      const activeElement = document.activeElement;
+      if (activeElement !== this.sceneManager.hiddenInput) {
+        this.sceneManager.hiddenInput.focus();
+      }
     }
 
     if (this.sceneManager.animationManager) {
@@ -137,7 +174,7 @@ export class EventManager {
   }
 
   onWheel(event) {
-    if (this.sceneManager.terminalFocused && this.sceneManager.hoveringScreen) {
+    if (this.sceneManager.terminalFocused) {
       event.preventDefault();
 
       if (event.deltaY > 0) {
@@ -207,9 +244,5 @@ export class EventManager {
       this.boundHandlers.terminalFocus,
     );
     window.removeEventListener("terminalBlur", this.boundHandlers.terminalBlur);
-    window.removeEventListener(
-      "terminalReady",
-      this.boundHandlers.terminalReady,
-    );
   }
 }

@@ -4,11 +4,65 @@
   box-sizing: border-box;
 }
 
+:root {
+  --retro-bg-deep: #030303;
+  --retro-bg-mid: #090909;
+  --retro-bg-slate: #111111;
+  --retro-bg-haze: rgba(180, 180, 180, 0.08);
+  --retro-cyan: #8be9fd;
+  --retro-cyan-dim: rgba(139, 233, 253, 0.2);
+}
+
 body {
-  background: #0a0a0a;
+  background:
+    radial-gradient(
+      130% 85% at 52% 0%,
+      var(--retro-bg-haze) 0%,
+      rgba(24, 24, 24, 0.5) 35%,
+      rgba(8, 8, 8, 0.96) 72%,
+      rgba(3, 3, 3, 1) 100%
+    ),
+    linear-gradient(
+      155deg,
+      var(--retro-bg-slate) 0%,
+      var(--retro-bg-mid) 48%,
+      var(--retro-bg-deep) 100%
+    );
   font-family:
     "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", monospace;
   overflow: hidden;
+  min-height: 100vh;
+  position: relative;
+  color: #e8f7ff;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(180, 238, 255, 0.025) 2px,
+    rgba(180, 238, 255, 0.025) 3px
+  );
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 22%, rgba(115, 115, 115, 0.12) 0%, transparent 42%),
+    radial-gradient(circle at 88% 14%, rgba(90, 90, 90, 0.11) 0%, transparent 38%),
+    radial-gradient(circle at 52% 100%, rgba(52, 52, 52, 0.19) 0%, transparent 44%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .scene-container {
@@ -18,7 +72,14 @@ body {
   width: 100vw;
   height: 100vh;
   z-index: 10;
-  background: #0a0a0a;
+  background:
+    radial-gradient(
+      75% 55% at 54% 8%,
+      rgba(146, 146, 146, 0.11) 0%,
+      rgba(35, 35, 35, 0.2) 42%,
+      rgba(8, 8, 8, 0.9) 100%
+    ),
+    linear-gradient(150deg, #161616 0%, #0c0c0c 56%, #050505 100%);
   opacity: 0;
   visibility: hidden;
   animation: scene-appear 1s ease-out forwards;
@@ -110,6 +171,121 @@ body {
   text-shadow: 0 0 1px rgba(119, 119, 119, 0.5);
 }
 
+/* Guide - minimal bottom-right checklist */
+.guide-checklist {
+  position: absolute;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  text-align: left;
+  max-width: min(380px, 40vw);
+}
+
+.guide-checklist:not(.hidden) {
+  opacity: 1;
+}
+
+.guide-checklist.hidden {
+  display: none;
+}
+
+.guide-checklist.guide-fade-out {
+  opacity: 0;
+}
+
+.guide-task {
+  color: #888888;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+.guide-task.done {
+  color: #556655;
+  opacity: 0.55;
+}
+
+.guide-task.done .guide-check-mark {
+  color: #5a9a6a;
+}
+
+.guide-check-mark {
+  color: #888888;
+}
+
+.guide-hint {
+  color: #cc9955;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  margin-top: 6px;
+  opacity: 0;
+  animation: guide-hint-in 0.8s ease forwards;
+  text-shadow: 0 0 4px rgba(204, 153, 85, 0.25);
+}
+
+@keyframes guide-hint-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.guide-chapter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 7px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid rgba(136, 136, 136, 0.25);
+}
+
+.guide-chapter-title {
+  color: #aaaaaa;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.guide-progress {
+  color: #777777;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+
+/* Guide - bottom-center fun fact with typing effect */
+.guide-funfact {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #bbbbbb;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
+  max-width: min(560px, 48vw);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  text-shadow: 0 0 6px rgba(187, 187, 187, 0.35);
+}
+
+.guide-funfact.visible {
+  opacity: 0.8;
+}
+
+.guide-funfact.hidden {
+  display: none;
+}
+
+.guide-funfact.guide-fade-out {
+  opacity: 0;
+}
+
 .audio-btn {
   border: none;
   color: #888888;
@@ -156,6 +332,17 @@ body {
     font-size: 12px;
     padding: 6px 10px;
   }
+
+  .guide-checklist {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .guide-funfact {
+    max-width: min(400px, 70vw);
+    font-size: 9px;
+    bottom: 16px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -170,6 +357,20 @@ body {
   .audio-btn {
     font-size: 11px;
     padding: 5px 8px;
+  }
+
+  .guide-checklist {
+    bottom: 12px;
+    right: 12px;
+  }
+
+  .guide-task {
+    font-size: 11px;
+  }
+
+  .guide-funfact {
+    max-width: 80vw;
+    font-size: 9px;
   }
 }
 
@@ -189,10 +390,10 @@ body {
       90deg,
       transparent,
       transparent 2px,
-      rgba(255, 255, 255, 0.02) 2px,
-      rgba(255, 255, 255, 0.02) 4px
+      rgba(230, 230, 230, 0.02) 2px,
+      rgba(230, 230, 230, 0.02) 4px
     ),
-    linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
+    linear-gradient(140deg, #1a1a1a 0%, #0f0f0f 48%, #070707 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -231,8 +432,9 @@ body {
   bottom: 0;
   background: radial-gradient(
     ellipse at center,
-    transparent 30%,
-    rgba(0, 0, 0, 0.4) 100%
+    rgba(190, 190, 190, 0.04) 18%,
+    rgba(22, 22, 22, 0.48) 62%,
+    rgba(7, 7, 7, 0.7) 100%
   );
   animation: loading-flicker 4s ease-in-out infinite;
   pointer-events: none;
@@ -764,12 +966,6 @@ body {
   }
 }
 
-.typed-text {
-}
-
-.audio-icon {
-}
-
 .hidden-input {
   position: absolute;
   left: -9999px;
@@ -889,4 +1085,10 @@ body {
   background: rgba(139, 233, 253, 0.4);
   color: #ffffff;
   text-shadow: 0 0 5px rgba(139, 233, 253, 0.5);
+}
+
+
+
+body.editor-active {
+  cursor: text !important;
 }

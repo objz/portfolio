@@ -13,9 +13,7 @@ export class ModelManager {
 
     this.performanceMode = this.detectDevice();
     this.textureSize = this.performanceMode ? 512 : 1024;
-    this.shadowMapSize = this.performanceMode ? 1024 : 2048;
     this.enableMipmaps = !this.performanceMode;
-    this.geometrySimplification = this.performanceMode ? 0.5 : 1.0;
   }
 
   detectDevice() {
@@ -79,12 +77,15 @@ export class ModelManager {
         c.receiveShadow = !this.performanceMode;
         this.sceneMeshes.push(c);
 
-        if (this.performanceMode && c.geometry) {
-          this.simplifyGeometry(c);
-        }
-
         if (c.material) {
-          this.optimizeMaterial(c.material);
+          if (Array.isArray(c.material)) {
+            c.material = c.material.map((material) =>
+              this.optimizeMaterial(material),
+            );
+          } else {
+            c.material = this.optimizeMaterial(c.material);
+          }
+
           this.identifyScreen(c);
         }
       } else if (c.isMesh) {
@@ -97,35 +98,9 @@ export class ModelManager {
     }
   }
 
-  simplifyGeometry(mesh) {
-    if (!mesh.geometry.attributes.position) return;
-
-    const geometry = mesh.geometry;
-    const positionArray = geometry.attributes.position.array;
-    const indexArray = geometry.index ? geometry.index.array : null;
-
-    if (positionArray.length < 300) return;
-
-    if (indexArray && indexArray.length > 1000) {
-      const decimationFactor = 0.7;
-      const newIndexArray = new Uint16Array(
-        Math.floor(indexArray.length * decimationFactor),
-      );
-
-      for (let i = 0; i < newIndexArray.length; i += 3) {
-        const sourceIndex = Math.floor(i / decimationFactor / 3) * 3;
-        if (sourceIndex + 2 < indexArray.length) {
-          newIndexArray[i] = indexArray[sourceIndex];
-          newIndexArray[i + 1] = indexArray[sourceIndex + 1];
-          newIndexArray[i + 2] = indexArray[sourceIndex + 2];
-        }
-      }
-
-      geometry.setIndex(new THREE.BufferAttribute(newIndexArray, 1));
-    }
-  }
-
   optimizeMaterial(material) {
+    if (!material) return material;
+
     if (material.map) {
       this.optimizeTexture(material.map);
     }
@@ -156,8 +131,9 @@ export class ModelManager {
       if (material.emissive) {
         material.emissive.multiplyScalar(this.performanceMode ? 0.3 : 0.5);
       }
+      return material;
     } else if (material.isMeshBasicMaterial) {
-      const newMaterial = new THREE.MeshStandardMaterial({
+      const optimizedMaterial = new THREE.MeshStandardMaterial({
         color: material.color,
         map: material.map,
         transparent: material.transparent,
@@ -167,13 +143,15 @@ export class ModelManager {
       });
 
       if (this.performanceMode) {
-        newMaterial.normalMap = null;
-        newMaterial.roughnessMap = null;
-        newMaterial.metalnessMap = null;
+        optimizedMaterial.normalMap = null;
+        optimizedMaterial.roughnessMap = null;
+        optimizedMaterial.metalnessMap = null;
       }
 
-      return newMaterial;
+      return optimizedMaterial;
     }
+
+    return material;
   }
 
   optimizeTexture(texture) {

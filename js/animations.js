@@ -46,9 +46,6 @@ export class AnimationManager {
     };
     this.lastValidPosition = new THREE.Vector3();
     this.lastValidTarget = new THREE.Vector3();
-
-    this.animationFrameSkip = this.performanceMode ? 2 : 1;
-    this.frameCounter = 0;
   }
 
   startupAnimation() {
@@ -80,21 +77,10 @@ export class AnimationManager {
     const targetState = this.cameraStates[stateName];
     const startPosition = this.camera.position.clone();
     const startTarget = this.controls.target.clone();
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     const animateStep = () => {
-      this.frameCounter++;
-      if (
-        this.performanceMode &&
-        this.frameCounter % this.animationFrameSkip !== 0
-      ) {
-        if (Date.now() - startTime < duration) {
-          requestAnimationFrame(animateStep);
-        }
-        return;
-      }
-
-      const elapsed = Date.now() - startTime;
+      const elapsed = performance.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const easeProgress = this.easeInOutCubic(progress);
 
@@ -120,7 +106,7 @@ export class AnimationManager {
     animateStep();
   }
 
-  updateIdleRotation(terminalFocused) {
+  updateIdleRotation(terminalFocused, deltaSeconds = 1 / 60) {
     if (this.startupPhase !== "complete") return;
     if (this.animatingCamera) return;
 
@@ -150,8 +136,9 @@ export class AnimationManager {
         ? this.idleRotationSpeed * 0.7
         : this.idleRotationSpeed;
 
-      this.idleAngle += rotationSpeed;
-      this.idleRotationCount += rotationSpeed;
+      const frameScale = Math.max(0.25, Math.min(2.5, deltaSeconds * 60));
+      this.idleAngle += rotationSpeed * frameScale;
+      this.idleRotationCount += rotationSpeed * frameScale;
 
       if (this.idleRotationCount >= this.maxIdleRotation) {
         this.resetIdleRotation();
@@ -197,11 +184,11 @@ export class AnimationManager {
     const startPosition = this.camera.position.clone();
     const startTarget = this.controls.target.clone();
     const targetTarget = new THREE.Vector3(0, 1.5, 0);
-    const startTime = Date.now();
+    const startTime = performance.now();
     const duration = this.performanceMode ? 1200 : 1500;
 
     const animateToIdleStart = () => {
-      const elapsed = Date.now() - startTime;
+      const elapsed = performance.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
       const easeProgress = this.easeInOutCubic(progress);
 

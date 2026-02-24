@@ -1,0 +1,596 @@
+{
+  "chapters": [
+    {
+      "title": "First Steps",
+      "tasks": [
+        {
+          "label": "run help to see all commands",
+          "match": "^help(\\s+.*)?$"
+        },
+        {
+          "label": "clean the screen with clear",
+          "match": "^clear(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: help",
+        "try: clear"
+      ],
+      "funFact": "a shell is just a loop: read input, find the program, run it, print the output. every terminal since 1971 works this way."
+    },
+    {
+      "title": "Look Around",
+      "tasks": [
+        {
+          "label": "find out where you are with pwd",
+          "match": "^pwd(\\s+.*)?$"
+        },
+        {
+          "label": "list everything here with ls",
+          "match": "^ls\\s*$"
+        }
+      ],
+      "hints": [
+        "try: pwd",
+        "try: ls"
+      ],
+      "funFact": "pwd stands for 'print working directory'. it tells you exactly where you are in the filesystem tree, like gps for your terminal."
+    },
+    {
+      "title": "Read Files",
+      "tasks": [
+        {
+          "label": "read about.txt",
+          "match": "^cat\\s+(.*/)?about\\.txt$"
+        },
+        {
+          "label": "read contact.txt",
+          "match": "^cat\\s+(.*/)?contact\\.txt$"
+        }
+      ],
+      "hints": [
+        "try: cat about.txt",
+        "try: cat contact.txt"
+      ],
+      "funFact": "cat is short for concatenate. it was built to join files together, but became the universal 'just show me the file' command. ken thompson wrote it in 1971."
+    },
+    {
+      "title": "Navigate",
+      "tasks": [
+        {
+          "label": "enter the projects folder",
+          "match": "^cd\\s+(.*/)?projects/?$"
+        },
+        {
+          "label": "verify you moved with pwd",
+          "match": "^pwd(\\s+.*)?$"
+        },
+        {
+          "label": "go back home with cd",
+          "match": "^cd\\s*(~|\\.\\.)?\\s*$"
+        }
+      ],
+      "hints": [
+        "try: cd projects",
+        "try: pwd then cd (with no arguments goes home)"
+      ],
+      "funFact": "unix paths use / as a separator because the original pdp-7 keyboard didn't have a backslash key. windows later chose \\\\ to be different."
+    },
+    {
+      "title": "Hidden Files",
+      "tasks": [
+        {
+          "label": "reveal hidden files with ls -a",
+          "match": "^(ls\\s+-[la]+|ll)(\\s+.*)?$"
+        },
+        {
+          "label": "read the .zshrc config file",
+          "match": "^cat\\s+(.*/)?(\\.zshrc|\\.config)$"
+        }
+      ],
+      "hints": [
+        "try: ls -a",
+        "try: cat .zshrc"
+      ],
+      "funFact": "files starting with a dot are hidden in unix. this was actually a bug in the original ls that checked for . and .. but accidentally hid all dotfiles. the bug became a feature."
+    },
+    {
+      "title": "Directory Tree",
+      "tasks": [
+        {
+          "label": "view the directory tree",
+          "match": "^tree\\s*$"
+        },
+        {
+          "label": "view the root filesystem with tree /",
+          "match": "^tree\\s+/\\s*$"
+        }
+      ],
+      "hints": [
+        "try: tree",
+        "try: tree /"
+      ],
+      "funFact": "a real linux system has hundreds of thousands of files. underneath, every file is just a number (an inode) in a flat table on disk."
+    },
+    {
+      "title": "System Config",
+      "tasks": [
+        {
+          "label": "navigate to /etc",
+          "match": "^cd\\s+/?etc/?$"
+        },
+        {
+          "label": "list the files there",
+          "match": "^ls(\\s+.*)?$"
+        },
+        {
+          "label": "read the passwd file",
+          "match": "^cat\\s+(.*/)?passwd$"
+        },
+        {
+          "label": "return home",
+          "match": "^cd\\s*(~|)$"
+        }
+      ],
+      "hints": [
+        "try: cd /etc then ls",
+        "try: cat passwd then cd"
+      ],
+      "funFact": "/etc/passwd dates back to the 1970s. modern systems store actual password hashes in /etc/shadow, which only root can read."
+    },
+    {
+      "title": "System Logs",
+      "tasks": [
+        {
+          "label": "navigate to /var/log",
+          "match": "^cd\\s+/?var(/log)?/?$"
+        },
+        {
+          "label": "read boot.log",
+          "match": "^cat\\s+(.*/)?boot\\.log$"
+        },
+        {
+          "label": "return home",
+          "match": "^cd\\s*(~|)$"
+        }
+      ],
+      "hints": [
+        "try: cd /var/log",
+        "try: cat boot.log then cd"
+      ],
+      "funFact": "every time linux boots, the kernel logs what it found: hardware, drivers, filesystems. sysadmins read these logs when something breaks at 3am."
+    },
+    {
+      "title": "Temp Files",
+      "tasks": [
+        {
+          "label": "navigate to /tmp",
+          "match": "^cd\\s+/?tmp/?$"
+        },
+        {
+          "label": "read rust.txt",
+          "match": "^cat\\s+(.*/)?rust\\.txt$"
+        },
+        {
+          "label": "return home",
+          "match": "^cd\\s*(~|)$"
+        }
+      ],
+      "hints": [
+        "try: cd /tmp",
+        "try: cat rust.txt then cd"
+      ],
+      "funFact": "/tmp is world-writable (permission 1777). the sticky bit means anyone can create files, but only the owner can delete them."
+    },
+    {
+      "title": "Your Projects",
+      "tasks": [
+        {
+          "label": "go to the projects directory",
+          "match": "^cd\\s+(.*/)?projects/?$"
+        },
+        {
+          "label": "list the repositories",
+          "match": "^ls(\\s+.*)?$"
+        },
+        {
+          "label": "read any .md file",
+          "match": "^cat\\s+[^\\s]+\\.md$"
+        }
+      ],
+      "hints": [
+        "try: cd projects then ls",
+        "try: cat followed by any .md file (use tab)"
+      ],
+      "funFact": "these .md files were fetched from the github api. the filesystem is virtual, running in webassembly, but behaves exactly like a real one."
+    },
+    {
+      "title": "Project Commands",
+      "tasks": [
+        {
+          "label": "view a project's metadata",
+          "match": "^project\\s+[^\\s]+"
+        },
+        {
+          "label": "read its full readme",
+          "match": "^readme\\s+[^\\s]+"
+        },
+        {
+          "label": "open it in your browser",
+          "match": "^open\\s+[^\\s]+"
+        },
+        {
+          "label": "return home",
+          "match": "^cd\\s*(~|)$"
+        }
+      ],
+      "hints": [
+        "try: project reponame (use tab)",
+        "try: readme reponame, open reponame, then cd"
+      ],
+      "funFact": "these commands hit the github api in real time. the project command is like man pages: a concept from 1971 where every unix tool had a manual."
+    },
+    {
+      "title": "Identity",
+      "tasks": [
+        {
+          "label": "print your username with whoami",
+          "match": "^whoami$"
+        },
+        {
+          "label": "print the hostname",
+          "match": "^hostname$"
+        }
+      ],
+      "hints": [
+        "try: whoami",
+        "try: hostname"
+      ],
+      "funFact": "whoami was added to unix in the 1970s. in multi-user systems with shared terminals, you genuinely might forget which account you logged into."
+    },
+    {
+      "title": "System Info",
+      "tasks": [
+        {
+          "label": "check system info with neofetch",
+          "match": "^neofetch(\\s+.*)?$"
+        },
+        {
+          "label": "print kernel info with uname",
+          "match": "^uname(\\s+.*)?$"
+        },
+        {
+          "label": "check uptime",
+          "match": "^uptime(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: neofetch",
+        "try: uname then uptime"
+      ],
+      "funFact": "neofetch is a modern flex tool for showing system specs. uname has existed since the 1970s. the -a flag shows all system info at once."
+    },
+    {
+      "title": "Date and Time",
+      "tasks": [
+        {
+          "label": "check the current date",
+          "match": "^date(\\s+.*)?$"
+        },
+        {
+          "label": "do some math with calc",
+          "match": "^calc\\s+.+"
+        }
+      ],
+      "hints": [
+        "try: date",
+        "try: calc 2+2 or calc 100/7"
+      ],
+      "funFact": "the date command outputs iso 8601 format by default. this standard ensures dates sort correctly: year-month-day. invented in 1988 to end date format wars."
+    },
+    {
+      "title": "Create Files",
+      "tasks": [
+        {
+          "label": "create a directory with mkdir",
+          "match": "^mkdir\\s+.+"
+        },
+        {
+          "label": "create a file with touch",
+          "match": "^touch\\s+.+"
+        },
+        {
+          "label": "verify with ls or tree",
+          "match": "^(ls|tree)(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: mkdir mydir",
+        "try: touch mydir/notes.txt then ls"
+      ],
+      "funFact": "touch doesn't just create files. it updates timestamps. sysadmins use it to mark when something was last checked."
+    },
+    {
+      "title": "Delete Files",
+      "tasks": [
+        {
+          "label": "create a test directory: mkdir testdir",
+          "match": "^mkdir\\s+.+"
+        },
+        {
+          "label": "try rm testdir (it will fail)",
+          "match": "^rm\\s+(?!.*-)[^\\s]+$"
+        },
+        {
+          "label": "remove it with rm -r testdir",
+          "match": "^rm\\s+(-[rRf]+\\s+.+|.+\\s+-[rRf]+)$"
+        }
+      ],
+      "hints": [
+        "try: mkdir testdir then rm testdir",
+        "try: rm -r testdir"
+      ],
+      "funFact": "there is no recycle bin in unix. rm unlinks the file's inode. this is why 'rm -rf /' is the most feared command in computing."
+    },
+    {
+      "title": "Copy and Move",
+      "tasks": [
+        {
+          "label": "copy a file with cp",
+          "match": "^cp\\s+.+\\s+.+"
+        },
+        {
+          "label": "rename or move with mv",
+          "match": "^mv\\s+.+\\s+.+"
+        }
+      ],
+      "hints": [
+        "try: cp about.txt backup.txt",
+        "try: mv backup.txt renamed.txt"
+      ],
+      "funFact": "mv and cp are from original unix (1971). mv is actually a rename at the filesystem level unless crossing filesystems, then it copies and deletes."
+    },
+    {
+      "title": "Symbolic Links",
+      "tasks": [
+        {
+          "label": "create a symlink with ln -s",
+          "match": "^ln\\s+-s\\s+.+"
+        },
+        {
+          "label": "verify with ls -la",
+          "match": "^(ls\\s+-[la]+|ll)(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: ln -s about.txt mylink",
+        "try: ls -la"
+      ],
+      "funFact": "symlinks are special files containing a path to another file. they can cross filesystems and point to directories. broken symlinks are a classic source of bugs."
+    },
+    {
+      "title": "Echo and Variables",
+      "tasks": [
+        {
+          "label": "echo a simple message",
+          "match": "^echo\\s+[^$>|]+"
+        },
+        {
+          "label": "print $HOME variable",
+          "match": "^echo\\s+.*\\$HOME"
+        },
+        {
+          "label": "print $PWD variable",
+          "match": "^echo\\s+.*\\$PWD"
+        }
+      ],
+      "hints": [
+        "try: echo hello world",
+        "try: echo $HOME then echo $PWD"
+      ],
+      "funFact": "environment variables like $HOME and $PWD are inherited by every process. $HOME was standardized in posix 1988 and exists on every unix system."
+    },
+    {
+      "title": "Command History",
+      "tasks": [
+        {
+          "label": "view your command history",
+          "match": "^history$"
+        },
+        {
+          "label": "use up arrow to recall a command",
+          "match": "^(pwd|ls|cat|cd|tree|echo)(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: history",
+        "press up arrow to cycle through previous commands"
+      ],
+      "funFact": "your history is stored in ~/.zsh_history. some developers have history files with 100,000+ entries spanning years of work."
+    },
+    {
+      "title": "Pipes",
+      "tasks": [
+        {
+          "label": "pipe a command through lolcat",
+          "match": "^.+\\|\\s*lolcat"
+        },
+        {
+          "label": "make the cow say something colorful",
+          "match": "^cowsay\\s+.+\\|\\s*lolcat"
+        }
+      ],
+      "hints": [
+        "try: echo hello | lolcat",
+        "try: cowsay moo | lolcat"
+      ],
+      "funFact": "pipes were invented by doug mcilroy at bell labs in 1973. the philosophy: make each program do one thing well, then connect them."
+    },
+    {
+      "title": "Output Redirection",
+      "tasks": [
+        {
+          "label": "write to a file with >",
+          "match": "^.+>\\s*[^\\s|]+"
+        },
+        {
+          "label": "read what you wrote",
+          "match": "^cat\\s+.+"
+        },
+        {
+          "label": "append with >>",
+          "match": "^.+>>\\s*[^\\s]+"
+        }
+      ],
+      "hints": [
+        "try: echo hello > myfile.txt",
+        "try: cat myfile.txt then echo world >> myfile.txt"
+      ],
+      "funFact": "unix has three standard streams: stdin (0), stdout (1), stderr (2). redirection rewires these at the kernel level. you can even redirect errors with 2>."
+    },
+    {
+      "title": "Command Chaining",
+      "tasks": [
+        {
+          "label": "chain two commands with &&",
+          "match": "^.+&&.+"
+        },
+        {
+          "label": "chain three commands",
+          "match": "^.+&&.+&&.+"
+        }
+      ],
+      "hints": [
+        "try: pwd && ls",
+        "try: pwd && ls && date"
+      ],
+      "funFact": "&& is the AND operator: run next only if previous succeeds. || is OR: run next only if previous fails. error handling in one character."
+    },
+    {
+      "title": "The Editor",
+      "tasks": [
+        {
+          "label": "open a file in nvim",
+          "match": "^nvim\\s+.+"
+        }
+      ],
+      "hints": [
+        "try: nvim about.txt",
+        "inside: i to type, Esc to stop, :wq to save and quit"
+      ],
+      "funFact": "vim uses modal editing: normal mode for navigation, insert mode for typing. designed in 1976 for terminals so slow that every keystroke had to count."
+    },
+    {
+      "title": "Easter Eggs",
+      "tasks": [
+        {
+          "label": "find the ascii art with echo $USER",
+          "match": "^echo\\s+\\$USER$"
+        },
+        {
+          "label": "typo ls as sl",
+          "match": "^sl(\\s+.*)?$"
+        },
+        {
+          "label": "try sudo",
+          "match": "^sudo\\s+.+"
+        }
+      ],
+      "hints": [
+        "try: echo $USER",
+        "try: sl then sudo ls"
+      ],
+      "funFact": "sl was written in 1993 by a japanese professor to punish students who mistyped ls. sudo (superuser do) was created in 1980 so admins didn't share root passwords."
+    },
+    {
+      "title": "Multiple Arguments",
+      "tasks": [
+        {
+          "label": "read two files at once",
+          "match": "^cat\\s+[^\\s]+\\s+[^\\s]+"
+        },
+        {
+          "label": "list multiple directories",
+          "match": "^ls\\s+[^\\s]+\\s+[^\\s]+"
+        }
+      ],
+      "hints": [
+        "try: cat about.txt contact.txt",
+        "try: ls /etc /tmp"
+      ],
+      "funFact": "cat was literally designed to concatenate files. cat file1 file2 outputs both in sequence. this is how you merge files: cat a.txt b.txt > combined.txt"
+    },
+    {
+      "title": "Complex Pipelines",
+      "tasks": [
+        {
+          "label": "chain cd, ls, and cat in one line",
+          "match": "^cd\\s+.+&&.+&&.*cat\\s+.+"
+        },
+        {
+          "label": "create and rainbow a file",
+          "match": "^cat\\s+.+\\|\\s*lolcat"
+        }
+      ],
+      "hints": [
+        "try: cd /etc && ls && cat passwd",
+        "try: cat about.txt | lolcat"
+      ],
+      "funFact": "you just did what sysadmins do hundreds of times a day: navigate, inspect, and transform data without leaving the keyboard."
+    },
+    {
+      "title": "Full System Info",
+      "tasks": [
+        {
+          "label": "print all system info with uname -a",
+          "match": "^uname\\s+.*-a"
+        },
+        {
+          "label": "cowsay through lolcat",
+          "match": "^cowsay\\s+.+\\|\\s*lolcat"
+        }
+      ],
+      "hints": [
+        "try: uname -a",
+        "try: cowsay hello | lolcat"
+      ],
+      "funFact": "uname -a shows kernel name, hostname, version, architecture, and more. this command exists on every unix system ever made since the 1970s."
+    },
+    {
+      "title": "Tab Completion",
+      "tasks": [
+        {
+          "label": "type cat ab then press tab",
+          "match": "^cat\\s+about\\.txt$"
+        },
+        {
+          "label": "type cd pro then press tab",
+          "match": "^cd\\s+projects/?$"
+        }
+      ],
+      "hints": [
+        "type cat ab then press tab to autocomplete",
+        "type cd pro then press tab"
+      ],
+      "funFact": "tab completion was added to csh in 1978 by bill joy. modern shells complete commands, files, git branches, hostnames, and more. it saves thousands of keystrokes per day."
+    },
+    {
+      "title": "Graduation",
+      "tasks": [
+        {
+          "label": "rainbow cowsay your final message",
+          "match": "^cowsay\\s+.+\\|\\s*lolcat"
+        },
+        {
+          "label": "clear the terminal",
+          "match": "^clear(\\s+.*)?$"
+        }
+      ],
+      "hints": [
+        "try: cowsay goodbye | lolcat",
+        "try: clear"
+      ],
+      "funFact": "training complete. you now know how to navigate, read, create, destroy, pipe, redirect, and chain commands. every command here works the same on a real linux machine."
+    }
+  ]
+}

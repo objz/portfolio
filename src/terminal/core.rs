@@ -6,6 +6,10 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{window, CanvasRenderingContext2d, Document, HtmlCanvasElement};
 
+const TERMINAL_ASPECT_RATIO: f64 = 700.0 / 550.0;
+const DEFAULT_CANVAS_WIDTH: f64 = 700.0;
+const DEFAULT_CANVAS_HEIGHT: f64 = 550.0;
+
 #[derive(Clone)]
 pub struct Terminal {
     pub renderer: TerminalRenderer,
@@ -14,6 +18,59 @@ pub struct Terminal {
 }
 
 impl Terminal {
+    fn compute_canvas_size() -> (f64, f64, f64) {
+        let Some(window) = window() else {
+            return (DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT, 1.0);
+        };
+
+        let viewport_width = window
+            .inner_width()
+            .ok()
+            .and_then(|value| value.as_f64())
+            .unwrap_or(1280.0);
+        let viewport_height = window
+            .inner_height()
+            .ok()
+            .and_then(|value| value.as_f64())
+            .unwrap_or(720.0);
+
+        let desktop_layout = viewport_width >= 1100.0 && viewport_height >= 720.0;
+
+        let (css_width, css_height) = if desktop_layout {
+            (DEFAULT_CANVAS_WIDTH, DEFAULT_CANVAS_HEIGHT)
+        } else {
+            let width_budget = (viewport_width * 0.88).clamp(320.0, DEFAULT_CANVAS_WIDTH);
+            let height_budget = (viewport_height * 0.56).clamp(240.0, DEFAULT_CANVAS_HEIGHT);
+
+            let mut width = width_budget;
+            let mut height = width / TERMINAL_ASPECT_RATIO;
+
+            if height > height_budget {
+                height = height_budget;
+                width = height * TERMINAL_ASPECT_RATIO;
+            }
+
+            (width.max(320.0), height.max(240.0))
+        };
+
+        let dpr = window.device_pixel_ratio().clamp(1.0, 2.0);
+
+        (css_width, css_height, dpr)
+    }
+
+    fn apply_canvas_size(canvas: &HtmlCanvasElement) {
+        let (css_width, css_height, dpr) = Self::compute_canvas_size();
+        let pixel_width = (css_width * dpr).round().max(320.0) as u32;
+        let pixel_height = (css_height * dpr).round().max(220.0) as u32;
+
+        canvas.set_width(pixel_width);
+        canvas.set_height(pixel_height);
+
+        let style = canvas.style();
+        let _ = style.set_property("width", &format!("{:.0}px", css_width));
+        let _ = style.set_property("height", &format!("{:.0}px", css_height));
+    }
+
     pub fn new(document: &Document) -> Self {
         let canvas = document
             .get_element_by_id("terminal")
@@ -21,11 +78,7 @@ impl Terminal {
             .dyn_into::<HtmlCanvasElement>()
             .expect("element is not a canvas");
 
-        let canvas_width = 700;
-        let canvas_height = 550;
-
-        canvas.set_width(canvas_width);
-        canvas.set_height(canvas_height);
+        Self::apply_canvas_size(&canvas);
 
         let context = canvas
             .get_context("2d")
@@ -35,6 +88,7 @@ impl Terminal {
             .expect("failed to cast to CanvasRenderingContext2d");
 
         let renderer = TerminalRenderer::new(canvas.clone(), context);
+        renderer.set_canvas_dimensions(canvas.width() as i32, canvas.height() as i32);
         let command_handler = CommandHandler::new();
         let base_prompt = "objz@portfolio".to_string();
 
@@ -80,6 +134,47 @@ impl Terminal {
         );
 
         mousemove_closure.forget();
+
+        let click_renderer = self.renderer.clone();
+        let click_closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| {
+            let rect = click_renderer.canvas.get_bounding_client_rect();
+            let x = event.client_x() as f64 - rect.left();
+            let y = event.client_y() as f64 - rect.top();
+
+            if let Some(url) = click_renderer.handle_click(x, y) {
+                if let Some(window) = window() {
+                    let _ = window.open_with_url_and_target(&url, "_blank");
+                }
+            }
+        }) as Box<dyn FnMut(_)>);
+
+        let _ = canvas_el
+            .add_event_listener_with_callback("click", click_closure.as_ref().unchecked_ref());
+
+        click_closure.forget();
+
+        let terminal_clone = self.clone();
+        let resize_closure = Closure::wrap(Box::new(move |_event: web_sys::Event| {
+            terminal_clone.resize_canvas_to_viewport();
+            terminal_clone.render();
+        }) as Box<dyn FnMut(_)>);
+
+        if let Some(window) = window() {
+            let _ = window.add_event_listener_with_callback(
+                "resize",
+                resize_closure.as_ref().unchecked_ref(),
+            );
+        }
+
+        resize_closure.forget();
+    }
+
+    pub fn resize_canvas_to_viewport(&self) {
+        Self::apply_canvas_size(&self.renderer.canvas);
+        self.renderer.set_canvas_dimensions(
+            self.renderer.canvas.width() as i32,
+            self.renderer.canvas.height() as i32,
+        );
     }
 
     pub fn get_current_prompt(&self) -> String {

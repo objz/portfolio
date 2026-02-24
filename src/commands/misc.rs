@@ -1,37 +1,19 @@
+use crate::commands::options::{self, OptionSpec};
+
 pub fn help(_args: &[&str]) -> String {
-    r#"Available commands:
+    let mut commands = crate::commands::registry::command_names();
+    commands.sort();
 
-System Info:
-  uname       - System information
-  uptime      - System uptime
-  neofetch    - Detailed system info
-  date        - Current date and time
+    let lines = commands
+        .chunks(8)
+        .map(|chunk| format!("  {}", chunk.join("  ")))
+        .collect::<Vec<_>>()
+        .join("\n");
 
-File System:
-  ls, ll      - List directory contents
-  cd          - Change directory
-  pwd         - Print working directory
-  cat         - Display file contents
-  tree        - Display directory tree
-  mkdir       - Create directory
-  touch       - Create empty file
-  rm          - Remove files/directories
-  ln          - Create symbolic links
-
-Utilities:
-  clear       - Clear screen
-  history     - Command history
-  echo        - Display text
-  cowsay      - ASCII cow with message
-  sl          - Steam locomotive
-  lolcat      - Rainbow text
-  calc        - Calculator
-  sudo        - Sudo access
-
-
-Type `ls`, then `cd projects` and `ls` again.  
-Run a project with `./project-name`.""#
-        .to_string()
+    format!(
+        "Available commands:\n\n{}\n\nUse `<command> --help` for command-specific usage.",
+        lines
+    )
 }
 
 pub fn sudo(args: &[&str]) -> String {
@@ -39,15 +21,9 @@ pub fn sudo(args: &[&str]) -> String {
         return "sudo: command required".into();
     }
 
-    let valid_commands = vec![
-        "clear", "history", "echo", "date", "uptime", "neofetch", "ls", "cd", "cat", "pwd", "tree",
-        "mkdir", "touch", "rm", "uname", "ln", "ll", "help", "sudo", "cowsay", "sl", "lolcat",
-        "calc",
-    ];
-
     let command = args[0];
 
-    if valid_commands.contains(&command) {
+    if crate::commands::registry::is_known_command(command) {
         "sudo: access denied.".into()
     } else {
         format!("zsh: command not found: {}", command)
@@ -55,87 +31,203 @@ pub fn sudo(args: &[&str]) -> String {
 }
 
 pub fn cowsay(args: &[&str]) -> String {
+    if args.iter().any(|arg| *arg == "--help") {
+        return "Usage: cowsay <message>\nExample: cowsay hello world".to_string();
+    }
+
     let message = if args.is_empty() {
-        "Hello from WASM!"
+        "Moo"
     } else {
         &args.join(" ")
     };
 
-    let bubble_line = "-".repeat(message.len() + 2);
+    let lines = wrap_words(message, 40);
+    let width = lines
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
 
-    format!(
-        r#" {}
-< {} >
- {}
-        \   ^__^
-         \  (oo)\_______
-            (__)\       )\/\
-                ||----w |
-                ||     ||"#,
-        bubble_line, message, bubble_line
-    )
+    let mut bubble = String::new();
+    bubble.push(' ');
+    bubble.push_str(&"_".repeat(width + 2));
+    bubble.push('\n');
+
+    if lines.len() == 1 {
+        bubble.push_str(&format!("< {:width$} >\n", lines[0], width = width));
+    } else {
+        for (index, line) in lines.iter().enumerate() {
+            let (left, right) = if index == 0 {
+                ('/', '\\')
+            } else if index + 1 == lines.len() {
+                ('\\', '/')
+            } else {
+                ('|', '|')
+            };
+
+            bubble.push_str(&format!(
+                "{} {:width$} {}\n",
+                left,
+                line,
+                right,
+                width = width
+            ));
+        }
+    }
+
+    bubble.push(' ');
+    bubble.push_str(&"-".repeat(width + 2));
+    bubble.push('\n');
+    bubble.push_str(
+        r#"        \
+         \   ^__^
+          \  (oo)\_______
+             (__)\       )\/\
+                 ||----w |
+                 ||     ||"#,
+    );
+
+    bubble
 }
 
-pub fn sl(_args: &[&str]) -> String {
-    r#"                 (@@) (  ) (@)  ( )  @@    ()    @     O     @     O      @
-            (   )
-        (@@@@)
-     (    )
+fn wrap_words(input: &str, max_width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current = String::new();
 
-   (@@@)
-====        ________                ___________
-_D _|  |_______/        \__I_I_____===__|_________|
- |(_)---  |   H\________/ |   |        =|___ ___|      _________________
- /     |  |   H  |  |     |   |         ||_| |_||     _|                \_____A
-|      |  |   H  |__--------------------| [___] |   =|                        |
-| ________|___H__/__|_____/[][]~\_______|       |   -|                        |
-|/ |   |-----------I_____I [][] []  D   |=======|____|________________________|_
-__/ =| o |=-~O=====O=====O=====O\ ____Y___________|__|__________________________|_
- |/-=|___|=    ||    ||    ||    |_____/~\___/          |_D__D__D_|  |_D__D__D_|
-  \_/      \__/  \__/  \__/  \__/      \_/               \_/   \_/    \_/   \_/
+    for raw_line in input.split('\n') {
+        if raw_line.trim().is_empty() {
+            if !current.is_empty() {
+                lines.push(current.clone());
+                current.clear();
+            }
+            lines.push(String::new());
+            continue;
+        }
 
-You have new mail."#
-        .to_string()
+        for word in raw_line.split_whitespace() {
+            let projected = if current.is_empty() {
+                word.chars().count()
+            } else {
+                current.chars().count() + 1 + word.chars().count()
+            };
+
+            if projected > max_width && !current.is_empty() {
+                lines.push(current.clone());
+                current.clear();
+            }
+
+            if !current.is_empty() {
+                current.push(' ');
+            }
+            current.push_str(word);
+        }
+
+        if !current.is_empty() {
+            lines.push(current.clone());
+            current.clear();
+        }
+    }
+
+    if lines.is_empty() {
+        vec![String::new()]
+    } else {
+        lines
+    }
 }
 
 pub fn lolcat(args: &[&str]) -> String {
-    if args.is_empty() {
-        "Usage: lolcat <text>".to_string()
-    } else {
-        format!("🌈 {} 🌈", args.join(" "))
+    let options = match options::parse(
+        "lolcat",
+        args,
+        OptionSpec::new(&['f'], &["force-color", "help"]),
+    ) {
+        Ok(options) => options,
+        Err(error) => return error,
+    };
+
+    if options.has_help() {
+        return "Usage: lolcat [text]\nExamples:\n  echo hello | lolcat\n  lolcat ".to_string();
     }
+
+    let input = if options.operands.is_empty() {
+        return "lolcat: missing input\nTry: echo hello | lolcat".to_string();
+    } else if options.operands.len() == 1 {
+        options.operands[0].clone()
+    } else {
+        options.operands.join(" ")
+    };
+
+    render_lolcat(&input)
+}
+
+fn render_lolcat(input: &str) -> String {
+    let mut output = String::new();
+    let mut hue = 0.0_f64;
+
+    for ch in input.chars() {
+        if ch == '\n' {
+            output.push_str("\x1b[0m\n");
+            continue;
+        }
+
+        let (r, g, b) = hsv_to_rgb(hue, 0.85, 1.0);
+        output.push_str(&format!("\x1b[38;2;{};{};{}m{}", r, g, b, ch));
+
+        hue += 6.5;
+        if hue >= 360.0 {
+            hue -= 360.0;
+        }
+    }
+
+    output.push_str("\x1b[0m");
+    output
+}
+
+fn hsv_to_rgb(h: f64, s: f64, v: f64) -> (u8, u8, u8) {
+    let c = v * s;
+    let x = c * (1.0 - (((h / 60.0) % 2.0) - 1.0).abs());
+    let m = v - c;
+
+    let (r1, g1, b1) = match h as i32 {
+        0..=59 => (c, x, 0.0),
+        60..=119 => (x, c, 0.0),
+        120..=179 => (0.0, c, x),
+        180..=239 => (0.0, x, c),
+        240..=299 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    let to_u8 = |value: f64| ((value + m) * 255.0).round().clamp(0.0, 255.0) as u8;
+    (to_u8(r1), to_u8(g1), to_u8(b1))
 }
 
 pub fn calc(args: &[&str]) -> String {
     if args.is_empty() {
-        return "Usage: calc <expression>\nExample: calc 2 + 2".to_string();
+        return "Usage: calc <expression>\nExamples:\n  calc 2 + 2\n  calc (5 + 3) * 2".to_string();
     }
 
     let expression = args.join(" ");
-
-    if let Some(result) = evaluate(&expression) {
-        format!("{} = {}", expression, result)
-    } else {
-        format!("Error: Cannot evaluate '{}'", expression)
+    match meval::eval_str(&expression) {
+        Ok(result) if result.is_finite() => format!("{} = {}", expression, result),
+        Ok(_) => format!(
+            "Error: expression produced a non-finite value for '{}'",
+            expression
+        ),
+        Err(error) => format!("Error: {}", error),
     }
 }
 
-fn evaluate(expr: &str) -> Option<f64> {
-    let parts: Vec<&str> = expr.split_whitespace().collect();
+#[cfg(test)]
+mod tests {
+    use super::calc;
 
-    if parts.len() == 3 {
-        if let (Ok(a), Ok(b)) = (parts[0].parse::<f64>(), parts[2].parse::<f64>()) {
-            match parts[1] {
-                "+" => Some(a + b),
-                "-" => Some(a - b),
-                "*" => Some(a * b),
-                "/" if b != 0.0 => Some(a / b),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    } else {
-        None
+    #[test]
+    fn calc_supports_exponent_operator() {
+        assert_eq!(calc(&["5^2"]), "5^2 = 25");
+    }
+
+    #[test]
+    fn calc_reports_parse_error() {
+        assert!(calc(&["5**2"]).starts_with("Error:"));
     }
 }

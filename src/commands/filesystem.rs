@@ -1,6 +1,9 @@
 use lazy_static::lazy_static;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
+
+const PROJECTS_PATH_PARTS: [&str; 3] = ["home", "objz", "projects"];
 
 #[derive(Clone, Debug)]
 pub enum Node {
@@ -22,15 +25,26 @@ pub enum Node {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct ProjectFileSpec {
+    pub file_name: String,
+    pub repo_name: String,
+    pub repo_url: String,
+    pub content: String,
+}
+
+#[derive(Clone, Deserialize)]
+struct FilesystemContent {
+    projects_readme: String,
+    about_txt: String,
+    contact_txt: String,
+    zshrc: String,
+    credits_txt: String,
+    rust_txt: String,
+    boot_log: String,
+}
+
 impl Node {
-    pub fn _is_directory(&self) -> bool {
-        matches!(self, Node::Directory { .. })
-    }
-
-    pub fn _is_file(&self) -> bool {
-        matches!(self, Node::File { .. })
-    }
-
     pub fn is_protected(&self) -> bool {
         match self {
             Node::File { protected, .. } => *protected,
@@ -49,6 +63,9 @@ impl Node {
 }
 
 lazy_static! {
+    static ref FILESYSTEM_CONTENT: FilesystemContent =
+        serde_json::from_str(include_str!("../../static/content/filesystem.json"))
+            .expect("static/content/filesystem.json must be valid");
     pub static ref FILESYSTEM: Mutex<Node> = Mutex::new({
         use Node::*;
         Directory {
@@ -77,27 +94,9 @@ lazy_static! {
                                             protected: true,
                                             children: HashMap::from([
                                                 (
-                                                    "CommandBridge.md".into(),
+                                                    "README.md".into(),
                                                     File {
-                                                        content: "A scripting-based plugin enabling advanced command forwarding between Velocity and Paper Minecraft servers. Supports flexible automation and custom workflows for server administrators.\n\nProject link: [https://github.com/objz/CommandBridge]\n\nStatus: Active development".into(),
-                                                        permissions: 0o644,
-                                                        owner: "objz".to_string(),
-                                                        protected: true,
-                                                    }
-                                                ),
-                                                (
-                                                    "mcl.md".into(),
-                                                    File {
-                                                        content: "A fast, Rust-powered command-line Minecraft launcher focused on performance and simplicity. Designed for direct launching, version management, and mod integration.\n\nProject link: [https://github.com/objz/mcl]\n\nStatus: In development (not finished yet)".into(),
-                                                        permissions: 0o644,
-                                                        owner: "objz".to_string(),
-                                                        protected: true,
-                                                    }
-                                                ),
-                                                (
-                                                    "PowerImport.md".into(),
-                                                    File {
-                                                        content: "An Excel VSTO add-in for importing and synchronizing Power BI queries directly into spreadsheets. Built for seamless integration and efficient data workflows in enterprise environments.\n\nProject link: [https://github.com/objz/PowerImport]\n\nStatus: Completed".into(),
+                                                        content: FILESYSTEM_CONTENT.projects_readme.clone(),
                                                         permissions: 0o644,
                                                         owner: "objz".to_string(),
                                                         protected: true,
@@ -109,7 +108,7 @@ lazy_static! {
                                     (
                                         "about.txt".into(),
                                         File {
-                                            content: "Hi, I'm objz and I'm 17 years old.\nMy main skills are:\n\n- Rust (primary)\n- Java (primary)\n- C (occasionally)\n- Web Development (only if absolutely necessary)".into(),
+                                            content: FILESYSTEM_CONTENT.about_txt.clone(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
                                             protected: true,
@@ -118,16 +117,16 @@ lazy_static! {
                                     (
                                         "contact.txt".into(),
                                         File {
-                                            content: "GitHub: @objz\nEmail: me@objz.dev\nLocation: Bavaria, Germany\nResponse time: Eventually™".into(),
+                                            content: FILESYSTEM_CONTENT.contact_txt.clone(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
                                             protected: true,
                                         }
                                     ),
                                     (
-                                        ".bashrc".into(),
+                                        ".zshrc".into(),
                                         File {
-                                            content: "# ~/.bashrc\nexport PS1='\\u@\\h:\\w\\$ '\nalias ll='ls -la'".into(),
+                                            content: FILESYSTEM_CONTENT.zshrc.clone(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
                                             protected: false,
@@ -136,7 +135,7 @@ lazy_static! {
                                     (
                                         "credits.txt".into(),
                                         File {
-                                            content: "This site was developed by objz.\n\nBuilt with:\n- Rust and WebAssembly (Wasm)\n- Three.js for 3D rendering\n\n3D model provided by Sketchfab: [https://shorturl.at/OXITb]\nLooping background music from Freesound: [https://shorturl.at/YYufx]\n\nNo warranty, express or implied.".into(),
+                                            content: FILESYSTEM_CONTENT.credits_txt.clone(),
                                             permissions: 0o644,
                                             owner: "objz".to_string(),
                                             protected: true,
@@ -185,7 +184,7 @@ lazy_static! {
                             (
                                 "rust.txt".into(),
                                 File {
-                                    content: "Did you know?\nRust was originally developed by Mozilla.\nThe first stable release was in 2015.".into(),
+                                    content: FILESYSTEM_CONTENT.rust_txt.clone(),
                                     permissions: 0o644,
                                     owner: "objz".to_string(),
                                     protected: false,
@@ -230,7 +229,7 @@ lazy_static! {
                                         (
                                             "boot.log".into(),
                                             File {
-                                                content: "Loading Linux kernel version 6.8.9-wasm-1...\nLoading initial ramdisk (initramfs)...\nStarting systemd-udevd v254.5-1...\nProbing hardware...\nDetected storage device: /dev/nvme0n1\nDetected storage device: /dev/sda\nActivating swap on /dev/sda2...\nMounting root filesystem...\nChecking file system on /dev/sda1...\nMounting /boot...\nMounting /home...\nMounting /var...\nStarting systemd-journald.service...\nStarting systemd-tmpfiles-setup-dev.service...\nStarting systemd-sysctl.service...\nStarting Load Kernel Modules...\nLoading kernel modules: i915 ext4 fuse...\nStarting Network Manager...\nStarting Login Service (systemd-logind)...\nStarting Authorization Manager (polkitd)...\nStarting User Manager for UID 1000...\nStarting Interface...".into(),
+                                                content: FILESYSTEM_CONTENT.boot_log.clone(),
                                                 permissions: 0o644,
                                                 owner: "root".to_string(),
                                                 protected: true,
@@ -248,6 +247,120 @@ lazy_static! {
     pub static ref CURRENT_PATH: Mutex<Vec<String>> =
         Mutex::new(vec!["home".to_string(), "objz".to_string()]);
     pub static ref CURRENT_USER: String = "objz".to_string();
+    static ref PROJECT_FILE_ORDER: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static ref PROJECT_FILE_URLS: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
+
+pub fn is_projects_path(path: &[String]) -> bool {
+    path.len() == PROJECTS_PATH_PARTS.len()
+        && path
+            .iter()
+            .zip(PROJECTS_PATH_PARTS)
+            .all(|(part, expected)| part == expected)
+}
+
+pub fn project_sort_rank(path: &[String], entry_name: &str) -> Option<usize> {
+    if !is_projects_path(path) {
+        return None;
+    }
+
+    PROJECT_FILE_ORDER
+        .lock()
+        .unwrap()
+        .iter()
+        .position(|name| name == entry_name)
+}
+
+pub fn project_url_for_token(token: &str) -> Option<String> {
+    let trimmed = token.trim().trim_matches('/');
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let key = trimmed.to_lowercase();
+    PROJECT_FILE_URLS.lock().unwrap().get(&key).cloned()
+}
+
+pub fn project_repo_candidates() -> Vec<String> {
+    let order = PROJECT_FILE_ORDER.lock().unwrap();
+    let mut candidates = Vec::new();
+
+    for file_name in order.iter() {
+        if file_name.eq_ignore_ascii_case("README.md") {
+            continue;
+        }
+
+        if let Some(repo) = file_name.strip_suffix(".md") {
+            candidates.push(repo.to_string());
+        }
+    }
+
+    candidates
+}
+
+pub fn replace_projects_directory(files: &[ProjectFileSpec]) -> Result<(), String> {
+    let mut filesystem = FILESYSTEM.lock().unwrap();
+    let projects_path: Vec<String> = PROJECTS_PATH_PARTS
+        .iter()
+        .map(|segment| segment.to_string())
+        .collect();
+
+    let projects_node = get_node_mut(&mut filesystem, &projects_path)
+        .ok_or_else(|| "projects directory is missing".to_string())?;
+
+    let children = match projects_node {
+        Node::Directory { children, .. } => children,
+        _ => return Err("projects path is not a directory".to_string()),
+    };
+
+    children.clear();
+
+    let mut order = Vec::new();
+    let mut url_map = HashMap::new();
+
+    let mut index_lines = vec![
+        "Projects folder is now synced from GitHub.".to_string(),
+        "Most recently updated repositories are listed first.".to_string(),
+        "Use `cat <repo>.md` to read a project document with rendered README.".to_string(),
+        String::new(),
+    ];
+
+    for file in files {
+        order.push(file.file_name.clone());
+
+        let key_file = file.file_name.to_lowercase();
+        url_map.insert(key_file, file.repo_url.clone());
+
+        let key_repo = file.repo_name.to_lowercase();
+        url_map.insert(key_repo, file.repo_url.clone());
+
+        children.insert(
+            file.file_name.clone(),
+            Node::File {
+                content: file.content.clone(),
+                permissions: 0o644,
+                owner: "objz".to_string(),
+                protected: true,
+            },
+        );
+
+        index_lines.push(format!("- {} -> {}", file.file_name, file.repo_url));
+    }
+
+    children.insert(
+        "README.md".to_string(),
+        Node::File {
+            content: index_lines.join("\n"),
+            permissions: 0o644,
+            owner: "objz".to_string(),
+            protected: true,
+        },
+    );
+
+    *PROJECT_FILE_ORDER.lock().unwrap() = order;
+    *PROJECT_FILE_URLS.lock().unwrap() = url_map;
+
+    Ok(())
 }
 
 pub fn normalize_path(path: &str, current: &[String]) -> Vec<String> {

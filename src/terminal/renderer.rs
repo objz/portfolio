@@ -38,8 +38,8 @@ pub struct TerminalRenderer {
     pub canvas: HtmlCanvasElement,
     pub context: CanvasRenderingContext2d,
     pub y: Cell<f64>,
-    pub width: i32,
-    pub height: i32,
+    pub width: Cell<i32>,
+    pub height: Cell<i32>,
     pub line_height: f64,
     pub char_width: f64,
     pub font_size: i32,
@@ -53,23 +53,49 @@ impl TerminalRenderer {
         let height = canvas.height() as i32;
         let font_size = 14;
         let line_height = font_size as f64 + 6.0;
-        let char_width = font_size as f64 * 0.6;
 
         context.set_font(&format!("{}px 'Courier New', monospace", font_size));
         context.set_text_baseline("top");
         context.set_image_smoothing_enabled(false);
 
+        let char_width = context
+            .measure_text("M")
+            .ok()
+            .map(|metrics| metrics.width())
+            .filter(|width| *width > 0.0)
+            .unwrap_or(font_size as f64 * 0.6);
+
         Self {
             canvas,
             context,
             y: Cell::new(20.0),
-            width,
-            height,
+            width: Cell::new(width),
+            height: Cell::new(height),
             line_height,
             char_width,
             font_size,
             cursor_blink_state: Cell::new(true),
             linkmap: RefCell::new(LinkMap::new()),
+        }
+    }
+
+    pub fn set_canvas_dimensions(&self, width: i32, height: i32) {
+        if width <= 0 || height <= 0 {
+            return;
+        }
+
+        self.width.set(width);
+        self.height.set(height);
+        self.y.set(20.0);
+        buffer::set_terminal_dimensions(self.max_chars_per_line(), self.max_visible_lines());
+    }
+
+    fn sync_dimensions_from_canvas(&self) {
+        let canvas_width = self.canvas.width() as i32;
+        let canvas_height = self.canvas.height() as i32;
+
+        if canvas_width != self.width.get() || canvas_height != self.height.get() {
+            self.set_canvas_dimensions(canvas_width, canvas_height);
         }
     }
 
@@ -133,26 +159,37 @@ impl TerminalRenderer {
     pub fn clear_screen(&self) {
         self.context.save();
         self.set_fill_color("#000000");
-        self.context
-            .fill_rect(0.0, 0.0, self.width as f64, self.height as f64);
+        let width = self.width.get() as f64;
+        let height = self.height.get() as f64;
+        self.context.fill_rect(0.0, 0.0, width, height);
         self.context.restore();
         self.y.set(20.0);
         self.linkmap.borrow_mut().clear();
     }
 
     pub fn max_visible_lines(&self) -> usize {
-        ((self.height as f64 - 40.0) / self.line_height) as usize
+        ((self.height.get() as f64 - 40.0) / self.line_height) as usize
     }
 
     pub fn max_chars_per_line(&self) -> usize {
-        ((self.width as f64 - 20.0) / self.char_width) as usize
+        ((self.width.get() as f64 - 20.0) / self.char_width) as usize
     }
 
     pub fn render(&self) {
+        self.sync_dimensions_from_canvas();
         self.clear_screen();
         buffer::set_terminal_dimensions(self.max_chars_per_line(), self.max_visible_lines());
-        let visible_lines = buffer::get_visible_lines(self.max_visible_lines() - 2);
         let state = buffer::get_terminal_state();
+        let reserved_input_lines = if state.input_mode == InputMode::Normal {
+            self.estimate_input_line_count(&state)
+        } else {
+            0
+        };
+
+        let output_capacity = self
+            .max_visible_lines()
+            .saturating_sub(reserved_input_lines.saturating_add(1));
+        let visible_lines = buffer::get_visible_lines(output_capacity);
 
         let mut y_offset = 20.0;
         for line in visible_lines {
@@ -163,6 +200,19 @@ impl TerminalRenderer {
 
         if state.input_mode == InputMode::Normal {
             self.render_input_line(&state, y_offset);
+        }
+    }
+
+    fn estimate_input_line_count(&self, state: &TerminalState) -> usize {
+        let max_chars = self.max_chars_per_line().max(1);
+        let prompt_chars = state.prompt.chars().count();
+        let first_line_capacity = max_chars.saturating_sub(prompt_chars).max(1);
+        let input_chars = state.current_input.chars().count();
+
+        if input_chars <= first_line_capacity {
+            1
+        } else {
+            1 + (input_chars - first_line_capacity + max_chars - 1) / max_chars
         }
     }
 
@@ -192,23 +242,94 @@ impl TerminalRenderer {
     }
 
     fn render_input_line(&self, state: &TerminalState, y: f64) {
-        self.clear_line_at_y(y);
+        let max_chars = self.max_chars_per_line().max(1);
+        let prompt_chars = state.prompt.chars().count();
+        let first_line_capacity = max_chars.saturating_sub(prompt_chars).max(1);
+        let input_chars: Vec<char> = state.current_input.chars().collect();
+
+        let mut wrapped_input = Vec::new();
+
+        if input_chars.is_empty() {
+            wrapped_input.push(String::new());
+        } else {
+            let first_end = input_chars.len().min(first_line_capacity);
+            wrapped_input.push(input_chars[..first_end].iter().collect());
+
+            let mut index = first_end;
+            while index < input_chars.len() {
+                let end = (index + max_chars).min(input_chars.len());
+                wrapped_input.push(input_chars[index..end].iter().collect());
+                index = end;
+            }
+        }
+
         self.draw_text(&state.prompt, 10.0, y, Some("#00ffff"));
 
-        let prompt_width = state.prompt.len() as f64 * self.char_width;
-        let input_x = 10.0 + prompt_width;
+        let prompt_width = prompt_chars as f64 * self.char_width;
+        let first_input_x = 10.0 + prompt_width;
 
-        if !state.current_input.is_empty() {
-            self.draw_text(&state.current_input, input_x, y, Some("#ffffff"));
+        if let Some(first_line) = wrapped_input.first() {
+            if !first_line.is_empty() {
+                self.draw_text(first_line, first_input_x, y, Some("#ffffff"));
+            }
+        }
+
+        let mut current_y = y + self.line_height;
+        for line in wrapped_input.iter().skip(1) {
+            if !line.is_empty() {
+                self.draw_text(line, 10.0, current_y, Some("#ffffff"));
+            }
+            current_y += self.line_height;
+        }
+
+        let cursor_pos = state.cursor_position.min(input_chars.len());
+        let (cursor_line, cursor_col) = if cursor_pos <= first_line_capacity {
+            (0, cursor_pos)
+        } else {
+            let remaining = cursor_pos - first_line_capacity;
+            (1 + (remaining / max_chars), remaining % max_chars)
+        };
+
+        if cursor_pos == input_chars.len()
+            && !state.autosuggestion.is_empty()
+            && state.autosuggestion.starts_with(&state.current_input)
+            && cursor_line == 0
+        {
+            let suggestion_tail: String = state
+                .autosuggestion
+                .chars()
+                .skip(input_chars.len())
+                .collect();
+
+            if !suggestion_tail.is_empty() {
+                let suggestion_x = if cursor_line == 0 {
+                    first_input_x + (cursor_col as f64 * self.char_width)
+                } else {
+                    10.0 + (cursor_col as f64 * self.char_width)
+                };
+
+                self.draw_text(&suggestion_tail, suggestion_x, y, Some("#5f6a70"));
+            }
         }
 
         if self.cursor_blink_state.get() {
-            let cursor_x = input_x + (state.cursor_position as f64 * self.char_width);
-            self.draw_cursor(cursor_x, y);
+            let cursor_x = if cursor_line == 0 {
+                first_input_x + (cursor_col as f64 * self.char_width)
+            } else {
+                10.0 + (cursor_col as f64 * self.char_width)
+            };
+            let cursor_y = y + (cursor_line as f64 * self.line_height);
+
+            self.draw_cursor(cursor_x, cursor_y);
         }
     }
 
     pub fn draw_text(&self, text: &str, x: f64, y: f64, color: Option<&str>) {
+        if text.contains('\u{1b}') {
+            self.draw_ansi_text(text, x, y, color);
+            return;
+        }
+
         self.linkmap
             .borrow_mut()
             .detect_links(text, x, y, self.char_width, self.line_height);
@@ -275,6 +396,103 @@ impl TerminalRenderer {
         self.context.restore();
     }
 
+    fn draw_ansi_text(&self, text: &str, x: f64, y: f64, color: Option<&str>) {
+        self.context.save();
+        self.setup_font();
+
+        let default_color = self.get_color_value(color.unwrap_or("#ffffff"));
+        let mut current_color = default_color.clone();
+        let mut current_x = x;
+        let mut segment = String::new();
+
+        let flush_segment =
+            |renderer: &Self, segment: &mut String, x: &mut f64, y: f64, color: &str| {
+                if segment.is_empty() {
+                    return;
+                }
+
+                renderer.set_fill_color(color);
+                let _ = renderer.context.fill_text(segment, *x, y);
+                *x += segment.chars().count() as f64 * renderer.char_width;
+                segment.clear();
+            };
+
+        let chars: Vec<char> = text.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            if chars[i] == '\u{1b}' && i + 1 < chars.len() && chars[i + 1] == '[' {
+                flush_segment(self, &mut segment, &mut current_x, y, &current_color);
+
+                i += 2;
+                let mut code_buf = String::new();
+                while i < chars.len() && chars[i] != 'm' {
+                    code_buf.push(chars[i]);
+                    i += 1;
+                }
+
+                if i < chars.len() && chars[i] == 'm' {
+                    current_color = self.resolve_ansi_color(&code_buf, &default_color);
+                }
+            } else {
+                segment.push(chars[i]);
+            }
+
+            i += 1;
+        }
+
+        flush_segment(self, &mut segment, &mut current_x, y, &current_color);
+        self.context.restore();
+    }
+
+    fn resolve_ansi_color(&self, codes: &str, default_color: &str) -> String {
+        if codes.is_empty() {
+            return default_color.to_string();
+        }
+
+        let parts: Vec<&str> = codes.split(';').collect();
+        let mut index = 0usize;
+        let mut current = default_color.to_string();
+
+        while index < parts.len() {
+            let code = parts[index].parse::<i32>().unwrap_or(-1);
+
+            match code {
+                0 | 39 => current = default_color.to_string(),
+                30 => current = "#000000".to_string(),
+                31 => current = "#ff5555".to_string(),
+                32 => current = "#50fa7b".to_string(),
+                33 => current = "#f1fa8c".to_string(),
+                34 => current = "#6272a4".to_string(),
+                35 => current = "#ff79c6".to_string(),
+                36 => current = "#8be9fd".to_string(),
+                37 => current = "#f8f8f2".to_string(),
+                90 => current = "#888888".to_string(),
+                91 => current = "#ff6e6e".to_string(),
+                92 => current = "#69ff94".to_string(),
+                93 => current = "#ffffa5".to_string(),
+                94 => current = "#8094d4".to_string(),
+                95 => current = "#ff92df".to_string(),
+                96 => current = "#a4ffff".to_string(),
+                97 => current = "#ffffff".to_string(),
+                38 => {
+                    if index + 4 < parts.len() && parts[index + 1] == "2" {
+                        let r = parts[index + 2].parse::<u8>().unwrap_or(255);
+                        let g = parts[index + 3].parse::<u8>().unwrap_or(255);
+                        let b = parts[index + 4].parse::<u8>().unwrap_or(255);
+                        current = format!("#{:02x}{:02x}{:02x}", r, g, b);
+                        index += 4;
+                    }
+                }
+                _ => {}
+            }
+
+            index += 1;
+        }
+
+        current
+    }
+
     pub fn draw_boot_line(&self, text: &str, y: f64, color: Option<&str>) {
         self.context.save();
         self.setup_font();
@@ -303,8 +521,8 @@ impl TerminalRenderer {
     fn clear_line_at_y(&self, y: f64) {
         self.context.save();
         self.set_fill_color("#000000");
-        self.context
-            .fill_rect(0.0, y, self.width as f64, self.line_height);
+        let width = self.width.get() as f64;
+        self.context.fill_rect(0.0, y, width, self.line_height);
         self.context.restore();
     }
 
@@ -380,7 +598,7 @@ impl TerminalRenderer {
     }
 
     fn handle_scroll_if_needed(&self) {
-        let max_lines = (self.height as f64 / self.line_height) as i32;
+        let max_lines = (self.height.get() as f64 / self.line_height) as i32;
         let current_line = ((self.y.get() - 20.0) / self.line_height) as i32;
 
         if current_line >= max_lines - 3 {
@@ -443,8 +661,8 @@ impl Clone for TerminalRenderer {
             canvas: self.canvas.clone(),
             context: self.context.clone(),
             y: Cell::new(self.y.get()),
-            width: self.width,
-            height: self.height,
+            width: Cell::new(self.width.get()),
+            height: Cell::new(self.height.get()),
             line_height: self.line_height,
             char_width: self.char_width,
             font_size: self.font_size,

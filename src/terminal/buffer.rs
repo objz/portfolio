@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineType {
     Normal,
@@ -14,7 +15,6 @@ pub struct BufferLine {
     pub content: String,
     pub line_type: LineType,
     pub color: Option<String>,
-    pub _timestamp: f64,
     pub wrapped_lines: Vec<String>,
 }
 
@@ -24,13 +24,17 @@ impl BufferLine {
             content,
             line_type,
             color,
-            _timestamp: js_sys::Date::now(),
             wrapped_lines: Vec::new(),
         }
     }
 
     pub fn calc_wrapping(&mut self, max_width: usize) {
         self.wrapped_lines.clear();
+
+        if self.content.contains('\u{1b}') {
+            self.wrapped_lines.push(self.content.clone());
+            return;
+        }
 
         let chars: Vec<char> = self.content.chars().collect();
 
@@ -80,6 +84,7 @@ impl BufferLine {
 #[derive(Debug, Clone)]
 pub struct TerminalState {
     pub current_input: String,
+    pub autosuggestion: String,
     pub cursor_position: usize,
     pub prompt: String,
     pub input_mode: InputMode,
@@ -96,6 +101,7 @@ impl Default for TerminalState {
     fn default() -> Self {
         Self {
             current_input: String::new(),
+            autosuggestion: String::new(),
             cursor_position: 0,
             prompt: "objz@portfolio:~$ ".to_string(),
             input_mode: InputMode::Normal,
@@ -110,7 +116,6 @@ pub struct LineBuffer {
     max_lines: RefCell<usize>,
     terminal_width: RefCell<usize>,
     terminal_height: RefCell<usize>,
-    max_scroll_lines: RefCell<usize>,
 }
 
 impl LineBuffer {
@@ -121,7 +126,6 @@ impl LineBuffer {
             max_lines: RefCell::new(1000), // keep history
             terminal_width: RefCell::new(80),
             terminal_height: RefCell::new(25),
-            max_scroll_lines: RefCell::new(100),
         }
     }
 
@@ -129,11 +133,14 @@ impl LineBuffer {
         *self.terminal_width.borrow_mut() = width;
         *self.terminal_height.borrow_mut() = height;
 
-        let width_copy = width;
-        let mut buffer = self.buffer.borrow_mut();
-        for line in buffer.iter_mut() {
-            line.calc_wrapping(width_copy);
+        {
+            let mut buffer = self.buffer.borrow_mut();
+            for line in buffer.iter_mut() {
+                line.calc_wrapping(width);
+            }
         }
+
+        self.clamp_scroll_offset();
     }
 
     pub fn add_line(&self, content: String, line_type: LineType, color: Option<String>) {
@@ -149,7 +156,7 @@ impl LineBuffer {
             buffer.pop_front();
         }
 
-        self.reset_scroll();
+        self.auto_scroll_bottom();
     }
 
     pub fn add_lines(&self, content: &str, line_type: LineType, color: Option<String>) {
@@ -169,28 +176,39 @@ impl LineBuffer {
     }
 
     pub fn get_visible_lines(&self, max_visual_lines: usize) -> Vec<BufferLine> {
-        let buffer = self.buffer.borrow();
-        let state = self.state.borrow();
-
-        let mut visual_lines = Vec::new();
-        let mut total_visual_count = 0;
-
-        for line in buffer.iter().rev() {
-            let line_visual_count = line.get_line_count();
-            if total_visual_count + line_visual_count > max_visual_lines + state.scroll_offset {
-                break;
-            }
-            visual_lines.insert(0, line.clone());
-            total_visual_count += line_visual_count;
+        if max_visual_lines == 0 {
+            return Vec::new();
         }
 
-        visual_lines
+        let visual_lines = self.flatten_visual_lines();
+        if visual_lines.is_empty() {
+            return Vec::new();
+        }
+
+        let total = visual_lines.len();
+        let scroll_offset = {
+            let mut state = self.state.borrow_mut();
+            let max_offset = total.saturating_sub(1);
+            if state.scroll_offset > max_offset {
+                state.scroll_offset = max_offset;
+            }
+            state.scroll_offset
+        };
+
+        let end = total.saturating_sub(scroll_offset);
+        let start = end.saturating_sub(max_visual_lines);
+
+        visual_lines[start..end].to_vec()
     }
 
     pub fn update_input(&self, input: String, cursor_pos: usize) {
         let mut state = self.state.borrow_mut();
         state.current_input = input;
         state.cursor_position = cursor_pos.min(state.current_input.chars().count());
+    }
+
+    pub fn update_autosuggestion(&self, suggestion: String) {
+        self.state.borrow_mut().autosuggestion = suggestion;
     }
 
     pub fn set_prompt(&self, prompt: String) {
@@ -221,18 +239,12 @@ impl LineBuffer {
     }
 
     pub fn scroll_up(&self, lines: usize) -> bool {
+        if lines == 0 {
+            return false;
+        }
+
         let mut state = self.state.borrow_mut();
-        let buffer = self.buffer.borrow();
-        let max_scroll = *self.max_scroll_lines.borrow();
-        let terminal_height = *self.terminal_height.borrow();
-
-        let total_visual_lines: usize = buffer.iter().map(|line| line.get_line_count()).sum();
-
-        let max_scroll_offset = if total_visual_lines > terminal_height {
-            (total_visual_lines - terminal_height).min(max_scroll)
-        } else {
-            0
-        };
+        let max_scroll_offset = self.max_scroll_offset();
 
         let new_offset = (state.scroll_offset + lines).min(max_scroll_offset);
 
@@ -245,6 +257,10 @@ impl LineBuffer {
     }
 
     pub fn scroll_down(&self, lines: usize) -> bool {
+        if lines == 0 {
+            return false;
+        }
+
         let mut state = self.state.borrow_mut();
         let new_offset = state.scroll_offset.saturating_sub(lines);
 
@@ -253,6 +269,55 @@ impl LineBuffer {
             true
         } else {
             false
+        }
+    }
+
+    fn flatten_visual_lines(&self) -> Vec<BufferLine> {
+        let buffer = self.buffer.borrow();
+        let mut visual_lines = Vec::new();
+
+        for line in buffer.iter() {
+            if line.wrapped_lines.is_empty() {
+                visual_lines.push(BufferLine::new(
+                    line.content.clone(),
+                    line.line_type.clone(),
+                    line.color.clone(),
+                ));
+                continue;
+            }
+
+            for wrapped in &line.wrapped_lines {
+                visual_lines.push(BufferLine::new(
+                    wrapped.clone(),
+                    line.line_type.clone(),
+                    line.color.clone(),
+                ));
+            }
+        }
+
+        visual_lines
+    }
+
+    fn max_scroll_offset(&self) -> usize {
+        let total_visual_lines = self.total_visual_line_count();
+        let terminal_height = *self.terminal_height.borrow();
+
+        total_visual_lines.saturating_sub(terminal_height)
+    }
+
+    fn total_visual_line_count(&self) -> usize {
+        self.buffer
+            .borrow()
+            .iter()
+            .map(|line| line.get_line_count())
+            .sum()
+    }
+
+    fn clamp_scroll_offset(&self) {
+        let max_scroll_offset = self.max_scroll_offset();
+        let mut state = self.state.borrow_mut();
+        if state.scroll_offset > max_scroll_offset {
+            state.scroll_offset = max_scroll_offset;
         }
     }
 }
@@ -287,6 +352,10 @@ pub fn get_visible_lines(max_lines: usize) -> Vec<BufferLine> {
 
 pub fn update_input_state(input: String, cursor_pos: usize) {
     LINE_BUFFER.with(|buffer| buffer.update_input(input, cursor_pos));
+}
+
+pub fn update_autosuggestion(suggestion: String) {
+    LINE_BUFFER.with(|buffer| buffer.update_autosuggestion(suggestion));
 }
 
 pub fn set_current_prompt(prompt: String) {

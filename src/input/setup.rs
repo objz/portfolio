@@ -1,13 +1,15 @@
+use crate::commands::registry;
 use crate::commands::CommandHandler;
+use crate::input::editor::{self, EditorEvent};
 use crate::input::history::CommandHistory;
-use crate::terminal::autocomplete::{find_common_prefix, AutoComplete, CompletionResult};
+use crate::terminal::autocomplete::{AutoComplete, CompletionResult};
 use crate::terminal::buffer::{self, InputMode};
 use crate::terminal::Terminal;
 use crate::utils::panic;
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{window, HtmlInputElement, KeyboardEvent};
+use web_sys::{window, CustomEvent, HtmlInputElement, KeyboardEvent};
 
 thread_local! {
     static CURRENT_INPUT: RefCell<String> = RefCell::new(String::new());
@@ -19,8 +21,8 @@ pub struct InputHandler;
 
 impl InputHandler {
     pub fn setup(terminal: &Terminal, hidden_input: &HtmlInputElement) {
-        let history = CommandHistory::new();
-        let processor = terminal.command_handler.clone();
+        let history = Rc::new(RefCell::new(CommandHistory::new()));
+        let processor = Rc::new(RefCell::new(terminal.command_handler.clone()));
 
         let terminal_clone = terminal.clone();
         let hidden_input_clone = hidden_input.clone();
@@ -28,12 +30,20 @@ impl InputHandler {
         let input_callback = {
             let terminal = terminal_clone.clone();
             let hidden_input = hidden_input_clone.clone();
+            let history = history.clone();
 
             Closure::wrap(Box::new(move |_event: web_sys::Event| {
+                if editor::is_active() {
+                    hidden_input.set_value("");
+                    return;
+                }
+
                 let state = buffer::get_terminal_state();
                 if state.input_mode == InputMode::Disabled {
                     return;
                 }
+
+                history.borrow_mut().reset_navigation();
                 let current_value = hidden_input.value();
                 CURRENT_INPUT.with(|input| {
                     *input.borrow_mut() = current_value.clone();
@@ -44,7 +54,24 @@ impl InputHandler {
                     .unwrap_or(Some(0))
                     .unwrap_or(0) as usize;
 
+                let current_path = {
+                    use crate::commands::filesystem::CURRENT_PATH;
+                    CURRENT_PATH.lock().unwrap().clone()
+                };
+
+                let suggestion = {
+                    let history_ref = history.borrow();
+                    Self::build_autosuggestion(
+                        &current_value,
+                        cursor_pos,
+                        &history_ref,
+                        &current_path,
+                    )
+                };
+
                 buffer::update_input_state(current_value, cursor_pos);
+                buffer::update_autosuggestion(suggestion);
+                buffer::auto_scroll_to_bottom();
                 terminal.render();
             }) as Box<dyn FnMut(_)>)
         };
@@ -57,10 +84,31 @@ impl InputHandler {
         let keydown_callback = {
             let terminal = terminal_clone.clone();
             let hidden_input = hidden_input_clone.clone();
-            let history = RefCell::new(history);
-            let processor = RefCell::new(processor);
+            let history = history.clone();
+            let processor = processor.clone();
 
             Closure::wrap(Box::new(move |event: KeyboardEvent| {
+                if editor::is_active() {
+                    event.prevent_default();
+                    event.stop_propagation();
+                    hidden_input.set_value("");
+
+                    match editor::handle_key(&event) {
+                        EditorEvent::Continue => {
+                            editor::render(&terminal.renderer);
+                        }
+                        EditorEvent::Exit { message } => {
+                            if let Some(message) = message {
+                                if !message.trim().is_empty() {
+                                    buffer::add_output_lines(&message, None);
+                                }
+                            }
+                            Self::handle_input(&terminal, &hidden_input);
+                        }
+                    }
+                    return;
+                }
+
                 let state = buffer::get_terminal_state();
                 if state.input_mode == InputMode::Disabled {
                     event.prevent_default();
@@ -81,28 +129,40 @@ impl InputHandler {
                     }
                     "ArrowUp" => {
                         event.prevent_default();
-                        if let Some(cmd) = history.borrow_mut().prev() {
-                            hidden_input.set_value(cmd);
+                        if let Some(cmd) = history.borrow_mut().prev(&current_input) {
+                            hidden_input.set_value(&cmd);
                             CURRENT_INPUT.with(|input| {
                                 *input.borrow_mut() = cmd.clone();
                             });
-                            buffer::update_input_state(cmd.clone(), cmd.len());
+
+                            let cursor = cmd.chars().count();
+                            let _ = hidden_input.set_selection_range(cursor as u32, cursor as u32);
+
+                            buffer::update_autosuggestion(String::new());
+                            buffer::update_input_state(cmd, cursor);
                             terminal.render();
                         }
                     }
                     "ArrowDown" => {
                         event.prevent_default();
                         if let Some(cmd) = history.borrow_mut().next() {
-                            hidden_input.set_value(cmd);
+                            hidden_input.set_value(&cmd);
                             CURRENT_INPUT.with(|input| {
                                 *input.borrow_mut() = cmd.clone();
                             });
-                            buffer::update_input_state(cmd.clone(), cmd.len());
+
+                            let cursor = cmd.chars().count();
+                            let _ = hidden_input.set_selection_range(cursor as u32, cursor as u32);
+
+                            buffer::update_autosuggestion(String::new());
+                            buffer::update_input_state(cmd, cursor);
                         } else {
                             hidden_input.set_value("");
                             CURRENT_INPUT.with(|input| {
                                 input.borrow_mut().clear();
                             });
+                            let _ = hidden_input.set_selection_range(0, 0);
+                            buffer::update_autosuggestion(String::new());
                             buffer::update_input_state(String::new(), 0);
                         }
                         terminal.render();
@@ -129,7 +189,32 @@ impl InputHandler {
                             .unwrap_or(Some(0))
                             .unwrap_or(0) as usize;
 
-                        let input_len = current_input.len();
+                        let input_len = current_input.chars().count();
+
+                        if current_cursor == input_len {
+                            let state = buffer::get_terminal_state();
+                            if !state.autosuggestion.is_empty()
+                                && state.autosuggestion.starts_with(&current_input)
+                                && state.autosuggestion != current_input
+                            {
+                                let suggested = state.autosuggestion;
+                                hidden_input.set_value(&suggested);
+                                CURRENT_INPUT.with(|input| {
+                                    *input.borrow_mut() = suggested.clone();
+                                });
+
+                                let cursor = suggested.chars().count();
+                                let _ =
+                                    hidden_input.set_selection_range(cursor as u32, cursor as u32);
+
+                                buffer::update_autosuggestion(String::new());
+                                buffer::update_input_state(suggested, cursor);
+                                buffer::auto_scroll_to_bottom();
+                                terminal.render();
+                                return;
+                            }
+                        }
+
                         if current_cursor < input_len {
                             let new_cursor = current_cursor + 1;
                             let _ = hidden_input
@@ -155,6 +240,25 @@ impl InputHandler {
                     "Tab" => {
                         event.prevent_default();
                         Self::handle_tab(&terminal, &hidden_input, &current_input);
+                    }
+                    "PageUp" => {
+                        event.prevent_default();
+                        if buffer::scroll_up(10) {
+                            terminal.render();
+                        }
+                    }
+                    "PageDown" => {
+                        event.prevent_default();
+                        if buffer::scroll_down(10) {
+                            terminal.render();
+                        }
+                    }
+                    "l" | "L" if event.ctrl_key() => {
+                        event.prevent_default();
+                        buffer::clear_buffer();
+                        buffer::reset_scroll();
+                        buffer::update_autosuggestion(String::new());
+                        terminal.render();
                     }
                     _ => {}
                 }
@@ -323,6 +427,8 @@ impl InputHandler {
         let trimmed_input = current_input.trim();
 
         if panic::should_panic(trimmed_input) {
+            Self::dispatch_command_event(trimmed_input);
+            buffer::reset_scroll();
             history.add(trimmed_input.to_string());
             let prompt = terminal.get_current_prompt();
             buffer::add_command_line(&prompt, trimmed_input);
@@ -330,6 +436,7 @@ impl InputHandler {
             hidden_input.set_value("");
             CURRENT_INPUT.with(|input| input.borrow_mut().clear());
             buffer::update_input_state(String::new(), 0);
+            buffer::update_autosuggestion(String::new());
             buffer::set_input_mode(InputMode::Disabled);
 
             let terminal_clone = terminal.clone();
@@ -342,6 +449,8 @@ impl InputHandler {
         }
 
         if !trimmed_input.is_empty() {
+            Self::dispatch_command_event(trimmed_input);
+            buffer::reset_scroll();
             history.add(trimmed_input.to_string());
             let prompt = terminal.get_current_prompt();
             buffer::add_command_line(&prompt, trimmed_input);
@@ -350,14 +459,14 @@ impl InputHandler {
         hidden_input.set_value("");
         CURRENT_INPUT.with(|input| input.borrow_mut().clear());
         buffer::update_input_state(String::new(), 0);
+        buffer::update_autosuggestion(String::new());
         buffer::set_input_mode(InputMode::Disabled);
 
         if !trimmed_input.is_empty() {
             let (result, _directory_changed) = processor.handle(trimmed_input);
 
-            // Extract the String from CommandResult::Output before treating it like text
-            if let crate::commands::processor::CommandResult::Output(s) = result {
-                match s.as_str() {
+            match result {
+                crate::commands::processor::CommandResult::Output(s) => match s.as_str() {
                     "CLEAR_SCREEN" => {
                         buffer::clear_buffer();
                         Self::handle_input(terminal, hidden_input);
@@ -370,18 +479,37 @@ impl InputHandler {
                             Self::handle_input(&terminal_clone, &hidden_input_clone);
                         });
                     }
+                    other if other.starts_with("__OPEN_EDITOR__:") => {
+                        let target = other.trim_start_matches("__OPEN_EDITOR__:").trim();
+                        match editor::open(target) {
+                            Ok(()) => {
+                                hidden_input.set_value("");
+                                CURRENT_INPUT.with(|input| input.borrow_mut().clear());
+                                editor::render(&terminal.renderer);
+                            }
+                            Err(error) => {
+                                buffer::add_output_lines(&error, None);
+                                Self::handle_input(terminal, hidden_input);
+                            }
+                        }
+                    }
                     other if !other.is_empty() => {
                         buffer::add_output_lines(other, None);
                         Self::handle_input(terminal, hidden_input);
                     }
                     _ => {
-                        // empty output: just redraw prompt
                         Self::handle_input(terminal, hidden_input);
                     }
+                },
+                crate::commands::processor::CommandResult::Animated(animation) => {
+                    let terminal_clone = terminal.clone();
+                    let hidden_input_clone = hidden_input.clone();
+
+                    spawn_local(async move {
+                        animation(terminal_clone.renderer.clone()).await;
+                        Self::handle_input(&terminal_clone, &hidden_input_clone);
+                    });
                 }
-            } else {
-                // Animated command: redraw prompt (animation is handled elsewhere)
-                Self::handle_input(terminal, hidden_input);
             }
         } else {
             Self::handle_input(terminal, hidden_input);
@@ -392,10 +520,36 @@ impl InputHandler {
         let prompt = terminal.get_current_prompt();
         buffer::set_current_prompt(prompt);
         buffer::set_input_mode(InputMode::Normal);
-        buffer::auto_scroll_to_bottom();
+        buffer::reset_scroll();
+        buffer::update_autosuggestion(String::new());
 
         terminal.render();
+
+        if let Some(window) = window() {
+            if let Ok(event) = web_sys::CustomEvent::new("terminalFocus") {
+                let _ = window.dispatch_event(&event);
+            }
+        }
+
         let _ = hidden_input.focus();
+    }
+
+    fn dispatch_command_event(command: &str) {
+        if command.trim().is_empty() {
+            return;
+        }
+
+        if let Some(window) = window() {
+            if let Ok(event) = CustomEvent::new("terminalCommand") {
+                event.init_custom_event_with_can_bubble_and_cancelable_and_detail(
+                    "terminalCommand",
+                    false,
+                    false,
+                    &JsValue::from_str(command),
+                );
+                let _ = window.dispatch_event(&event);
+            }
+        }
     }
 
     fn handle_tab(terminal: &Terminal, hidden_input: &HtmlInputElement, current_input: &str) {
@@ -408,82 +562,35 @@ impl InputHandler {
             CURRENT_PATH.lock().unwrap().clone()
         };
 
-        let trimmed = current_input.trim();
-        let parts: Vec<&str> = trimmed.split_whitespace().collect();
-
-        let (command_prefix, completion_target) = if parts.is_empty() {
-            ("", current_input)
-        } else if parts.len() == 1 && !trimmed.ends_with(' ') {
-            ("", current_input)
-        } else {
-            if parts.len() == 1 {
-                (trimmed, "")
-            } else {
-                let last_space_idx = current_input.rfind(' ').unwrap_or(0);
-                let prefix = &current_input[..=last_space_idx];
-                let target = &current_input[last_space_idx + 1..];
-                (prefix, target)
-            }
-        };
+        let cursor_pos = hidden_input
+            .selection_start()
+            .ok()
+            .flatten()
+            .map(|position| position as usize)
+            .unwrap_or_else(|| current_input.len());
 
         let completion_result = AUTOCOMPLETE.with(|autocomplete| {
             autocomplete
                 .borrow_mut()
-                .complete(current_input, &current_path)
+                .complete(current_input, cursor_pos, &current_path)
         });
 
         match completion_result {
             CompletionResult::None => {}
-            CompletionResult::Single(completion) => {
-                let full_completion = if command_prefix.is_empty() {
-                    completion
-                } else {
-                    format!("{}{}", command_prefix, completion)
-                };
-
-                hidden_input.set_value(&full_completion);
-                CURRENT_INPUT.with(|input| {
-                    *input.borrow_mut() = full_completion.clone();
-                });
-
-                let cursor_pos = full_completion.len();
-                let _ = hidden_input.set_selection_range(cursor_pos as u32, cursor_pos as u32);
-
-                buffer::update_input_state(full_completion, cursor_pos);
-                terminal.render();
+            CompletionResult::Single(edit) => {
+                Self::apply_completion_edit(terminal, hidden_input, edit);
             }
-            CompletionResult::Multiple(completions) => {
-                if let Some(common_prefix) = find_common_prefix(&completions) {
-                    if common_prefix.len() > completion_target.len() {
-                        let full_completion = if command_prefix.is_empty() {
-                            common_prefix
-                        } else {
-                            format!("{}{}", command_prefix, common_prefix)
-                        };
-
-                        hidden_input.set_value(&full_completion);
-                        CURRENT_INPUT.with(|input| {
-                            *input.borrow_mut() = full_completion.clone();
-                        });
-
-                        let cursor_pos = full_completion.len();
-                        let _ =
-                            hidden_input.set_selection_range(cursor_pos as u32, cursor_pos as u32);
-
-                        buffer::update_input_state(full_completion, cursor_pos);
-                        terminal.render();
-                        return;
-                    }
+            CompletionResult::Multiple { options, common } => {
+                if let Some(edit) = common {
+                    Self::apply_completion_edit(terminal, hidden_input, edit);
+                    return;
                 }
 
-                let prompt = terminal.get_current_prompt();
-                buffer::add_command_line(&prompt, current_input);
-
-                let completions_text = if completions.len() <= 10 {
-                    completions.join("  ")
+                let completions_text = if options.len() <= 10 {
+                    options.join("  ")
                 } else {
                     let mut output = String::new();
-                    for (i, completion) in completions.iter().enumerate() {
+                    for (i, completion) in options.iter().enumerate() {
                         if i > 0 && i % 4 == 0 {
                             output.push('\n');
                         } else if i > 0 {
@@ -495,18 +602,87 @@ impl InputHandler {
                 };
 
                 buffer::add_output_lines(&completions_text, None);
+                buffer::auto_scroll_to_bottom();
 
-                Self::handle_input(terminal, hidden_input);
-                hidden_input.set_value(current_input);
-                CURRENT_INPUT.with(|input| {
-                    *input.borrow_mut() = current_input.to_string();
-                });
+                let restored_cursor = cursor_pos.min(current_input.len());
+                let _ = hidden_input
+                    .set_selection_range(restored_cursor as u32, restored_cursor as u32);
 
-                let cursor_pos = current_input.len();
-                let _ = hidden_input.set_selection_range(cursor_pos as u32, cursor_pos as u32);
-
-                buffer::update_input_state(current_input.to_string(), cursor_pos);
+                buffer::update_input_state(current_input.to_string(), restored_cursor);
+                buffer::update_autosuggestion(String::new());
                 terminal.render();
+            }
+        }
+    }
+
+    fn apply_completion_edit(
+        terminal: &Terminal,
+        hidden_input: &HtmlInputElement,
+        edit: crate::terminal::autocomplete::CompletionEdit,
+    ) {
+        hidden_input.set_value(&edit.input);
+
+        CURRENT_INPUT.with(|input| {
+            *input.borrow_mut() = edit.input.clone();
+        });
+
+        let cursor = edit.cursor.min(edit.input.len());
+        let _ = hidden_input.set_selection_range(cursor as u32, cursor as u32);
+
+        buffer::update_input_state(edit.input, cursor);
+        buffer::update_autosuggestion(String::new());
+        terminal.render();
+    }
+
+    fn build_autosuggestion(
+        current_input: &str,
+        cursor_pos: usize,
+        history: &CommandHistory,
+        current_path: &[String],
+    ) -> String {
+        if current_input.trim().is_empty() || cursor_pos < current_input.chars().count() {
+            return String::new();
+        }
+
+        if let Some(history_match) = history.suggest(current_input) {
+            return history_match;
+        }
+
+        let completion = AUTOCOMPLETE.with(|autocomplete| {
+            autocomplete
+                .borrow_mut()
+                .complete(current_input, current_input.len(), current_path)
+        });
+
+        match completion {
+            CompletionResult::Single(edit) => {
+                if edit.input.starts_with(current_input) {
+                    edit.input
+                } else {
+                    String::new()
+                }
+            }
+            CompletionResult::Multiple { common, .. } => {
+                if let Some(edit) = common {
+                    if edit.input.starts_with(current_input) {
+                        edit.input
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                }
+            }
+            CompletionResult::None => {
+                let mut commands = registry::command_names();
+                commands.sort();
+
+                commands
+                    .into_iter()
+                    .find(|candidate| {
+                        candidate.starts_with(current_input) && candidate.as_str() != current_input
+                    })
+                    .unwrap_or_default()
             }
         }
     }

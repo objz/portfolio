@@ -1,5 +1,6 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::{cell::RefCell, rc::Rc};
 use web_sys::Event;
 
 use input::setup::InputHandler;
@@ -9,14 +10,19 @@ use web_sys::HtmlInputElement;
 mod ascii;
 mod boot;
 mod commands;
+mod github;
 mod input;
+mod shell;
 mod terminal;
 mod utils;
 
 use terminal::Terminal;
 
 static TERMINAL_READY: AtomicBool = AtomicBool::new(false);
-static mut TERMINAL_INSTANCE: Option<Terminal> = None;
+
+thread_local! {
+    static TERMINAL_INSTANCE: RefCell<Option<Terminal>> = RefCell::new(None);
+}
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -37,18 +43,27 @@ pub fn main() {
 
     InputHandler::setup(&terminal, &hidden_input);
 
-    unsafe {
-        TERMINAL_INSTANCE = Some(terminal);
-    }
+    TERMINAL_INSTANCE.with(|instance| {
+        *instance.borrow_mut() = Some(terminal);
+    });
+
+    let boot_started = Rc::new(AtomicBool::new(false));
+    let boot_started_clone = boot_started.clone();
 
     let closure = Closure::wrap(Box::new(move |_event: Event| {
         TERMINAL_READY.store(true, Ordering::SeqCst);
 
-        wasm_bindgen_futures::spawn_local(async move {
-            unsafe {
-                if let Some(ref terminal) = TERMINAL_INSTANCE {
+        if boot_started_clone.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        TERMINAL_INSTANCE.with(|instance| {
+            let terminal = instance.borrow().clone();
+
+            if let Some(terminal) = terminal {
+                wasm_bindgen_futures::spawn_local(async move {
                     terminal.init_boot().await;
-                }
+                });
             }
         });
     }) as Box<dyn FnMut(_)>);

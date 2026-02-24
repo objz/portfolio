@@ -5,6 +5,9 @@ function getBasePath() {
 }
 
 const BASE_PATH = getBasePath();
+const KEY_SOUND_COUNT = 17;
+const MAIN_PRELOAD_TIMEOUT_MS = 2500;
+const KEY_PRELOAD_TIMEOUT_MS = 1200;
 
 export class AudioManager {
   constructor() {
@@ -16,9 +19,9 @@ export class AudioManager {
       click: new Audio(`${BASE_PATH}audio/click.wav`),
     };
 
-    this.keySounds = [];
     this.keySoundPool = [];
     this.poolSize = 5;
+    this.mouseDownTime = null;
 
     this.sounds.fan.loop = true;
     this.sounds.loop.loop = true;
@@ -35,7 +38,12 @@ export class AudioManager {
   async init() {
     if (this.initialized) return;
 
-    await this.preloadSounds();
+    try {
+      await this.preloadSounds();
+    } catch (error) {
+      console.warn("Audio preload completed with issues:", error);
+    }
+
     this.setVolume(this.mainVolume);
     this.setupClickListener();
     this.setupKeyListener();
@@ -43,32 +51,34 @@ export class AudioManager {
   }
 
   async preloadSounds() {
-    const mainPromises = Object.values(this.sounds).map((audio) => {
-      return new Promise((resolve) => {
-        if (audio.readyState >= 2) {
-          resolve();
-        } else {
-          audio.addEventListener("canplaythrough", resolve, { once: true });
-          audio.addEventListener(
-            "error",
-            () => {
-              console.warn(`Failed to load: ${audio.src}`);
-              resolve();
-            },
-            { once: true },
-          );
-          audio.load();
-        }
-      });
-    });
+    const mainPromises = Object.values(this.sounds).map((audio) =>
+      this.waitForAudioReady(audio, MAIN_PRELOAD_TIMEOUT_MS),
+    );
 
-    const existingKeys = await this.checkKeyFiles();
+    const mainResults = await Promise.allSettled(mainPromises);
+    const loadedMainCount = mainResults.filter(
+      (result) => result.status === "fulfilled" && result.value,
+    ).length;
 
-    for (const keyNumber of existingKeys) {
+    this.buildKeySoundPool();
+    this.soundsLoaded = true;
+
+    void this.preloadKeySoundsInBackground();
+
+    console.log(
+      `Main sounds ready (${loadedMainCount}/${Object.keys(this.sounds).length}). Key sounds warming in background.`,
+    );
+  }
+
+  buildKeySoundPool() {
+    this.keySoundPool = [];
+
+    for (let keyNumber = 1; keyNumber <= KEY_SOUND_COUNT; keyNumber++) {
       const keyInstances = [];
 
       for (let i = 0; i < this.poolSize; i++) {
         const audio = new Audio(`${BASE_PATH}audio/keys/key${keyNumber}.wav`);
+        audio.preload = "auto";
         keyInstances.push(audio);
       }
 
@@ -78,51 +88,87 @@ export class AudioManager {
         currentIndex: 0,
       });
     }
+  }
 
+  async preloadKeySoundsInBackground() {
     const keyPromises = this.keySoundPool.flatMap((pool) =>
-      pool.instances.map((audio) => {
-        return new Promise((resolve) => {
-          if (audio.readyState >= 2) {
-            resolve();
-          } else {
-            audio.addEventListener("canplaythrough", resolve, { once: true });
-            audio.addEventListener(
-              "error",
-              () => {
-                console.warn(`Failed to load: ${audio.src}`);
-                resolve();
-              },
-              { once: true },
-            );
-            audio.load();
-          }
-        });
-      }),
+      pool.instances.map((audio) =>
+        this.waitForAudioReady(audio, KEY_PRELOAD_TIMEOUT_MS),
+      ),
     );
 
-    await Promise.all([...mainPromises, ...keyPromises]);
+    const keyResults = await Promise.allSettled(keyPromises);
+    const loadedKeyCount = keyResults.filter(
+      (result) => result.status === "fulfilled" && result.value,
+    ).length;
+    const totalKeyCount = keyResults.length;
 
-    this.soundsLoaded = true;
     console.log(
-      `Sounds loaded! (${this.keySoundPool.length} key types with ${this.poolSize} instances each)`,
+      `Key sound warmup finished (${loadedKeyCount}/${totalKeyCount}).`,
     );
   }
 
-  async checkKeyFiles() {
-    const existingFiles = [];
+  waitForAudioReady(audio, timeoutMs) {
+    return new Promise((resolve) => {
+      if (audio.readyState >= 2) {
+        resolve(true);
+        return;
+      }
 
-    for (let i = 1; i <= 17; i++) {
-      try {
-        const response = await fetch(`${BASE_PATH}audio/keys/key${i}.wav`, {
-          method: "HEAD",
-        });
-        if (response.ok) {
-          existingFiles.push(i);
+      let settled = false;
+      let timeoutId = null;
+
+      const cleanup = () => {
+        audio.removeEventListener("canplaythrough", onReady);
+        audio.removeEventListener("loadeddata", onReady);
+        audio.removeEventListener("error", onError);
+        if (timeoutId !== null) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
         }
-      } catch (error) {}
-    }
+      };
 
-    return existingFiles;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(ok);
+      };
+
+      const onReady = () => finish(true);
+
+      const onError = () => {
+        console.warn(`Failed to load audio: ${audio.src}`);
+        finish(false);
+      };
+
+      timeoutId = window.setTimeout(() => {
+        console.warn(`Audio preload timeout: ${audio.src}`);
+        finish(false);
+      }, timeoutMs);
+
+      audio.addEventListener("canplaythrough", onReady);
+      audio.addEventListener("loadeddata", onReady);
+      audio.addEventListener("error", onError);
+
+      try {
+        audio.load();
+      } catch (error) {
+        console.warn(`Audio load threw for ${audio.src}:`, error);
+        finish(false);
+      }
+    });
+  }
+
+  safePlay(audio, name) {
+    if (!audio) return;
+
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch((error) => {
+        console.warn(`Failed to play '${name}':`, error);
+      });
+    }
   }
 
   setVolume(volume) {
@@ -207,15 +253,14 @@ export class AudioManager {
     this.sounds.loop.volume = this.ambientVolume;
 
     this.sounds.intro.currentTime = 0;
-    this.sounds.intro.play();
+    this.safePlay(this.sounds.intro, "intro");
 
     const onIntroEnd = () => {
-      this.sounds.intro.removeEventListener("ended", onIntroEnd);
       this.sounds.loop.currentTime = 0;
-      this.sounds.loop.play();
+      this.safePlay(this.sounds.loop, "loop");
     };
 
-    this.sounds.intro.addEventListener("ended", onIntroEnd);
+    this.sounds.intro.addEventListener("ended", onIntroEnd, { once: true });
   }
 
   play(name) {
@@ -231,20 +276,19 @@ export class AudioManager {
     } else if (name === "boot") {
       const snd = this.sounds[name];
       snd.currentTime = 0;
-      snd.play();
+      this.safePlay(snd, name);
 
       const onBootEnd = () => {
-        snd.removeEventListener("ended", onBootEnd);
         setTimeout(() => {
           this.playAmbient();
-        }, 2000);
+        }, 1200);
       };
 
-      snd.addEventListener("ended", onBootEnd);
+      snd.addEventListener("ended", onBootEnd, { once: true });
     } else {
       const snd = this.sounds[name];
       snd.currentTime = 0;
-      snd.play();
+      this.safePlay(snd, name);
     }
   }
 

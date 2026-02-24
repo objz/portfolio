@@ -1,12 +1,16 @@
 import init from "../pkg/portfolio.js";
 import { SceneManager } from "./scene.js";
+import { GuideManager } from "./guide.js";
 
 export class AppManager {
   constructor() {
     this.sceneManager = null;
+    this.guideManager = null;
     this.isStarted = false;
     this.isMuted = false;
+    this.sceneReady = false;
     this.typingInterval = null;
+    this.startupFallbackTimer = null;
 
     this.startButton = null;
     this.audioButton = null;
@@ -22,6 +26,7 @@ export class AppManager {
     try {
       await this.initWasm();
       this.initElements();
+      await this.initGuide();
       this.initEventListeners();
       this.initScene();
     } catch (error) {
@@ -44,6 +49,14 @@ export class AppManager {
     this.overlay = document.getElementById("overlay");
   }
 
+  async initGuide() {
+    this.guideManager = new GuideManager("./guide.json");
+    await this.guideManager.init();
+    
+    // Expose guide to window for dev access: window.guide.skipTo(16)
+    window.guide = this.guideManager;
+  }
+
   initEventListeners() {
     if (this.startButton) {
       this.startButton.addEventListener("click", () => this.startWebsite());
@@ -55,19 +68,87 @@ export class AppManager {
 
     window.addEventListener("beforeunload", () => this.dispose());
 
-    window.addEventListener("sceneReady", () => {
-      console.log("Scene is ready!");
+    window.addEventListener("sceneReady", (event) => {
+      this.handleSceneReady(event);
     });
   }
 
   async initScene() {
     this.sceneManager = new SceneManager();
+    this.startStartupFallbackTimer();
     console.log("3D Scene initialized!");
+  }
+
+  startStartupFallbackTimer() {
+    this.clearStartupFallbackTimer();
+
+    this.startupFallbackTimer = window.setTimeout(() => {
+      if (this.sceneReady || this.isStarted) {
+        return;
+      }
+
+      this.enableManualStart(
+        "Safe mode: startup took too long. You can start now.",
+      );
+    }, 12000);
+  }
+
+  clearStartupFallbackTimer() {
+    if (!this.startupFallbackTimer) {
+      return;
+    }
+
+    clearTimeout(this.startupFallbackTimer);
+    this.startupFallbackTimer = null;
+  }
+
+  handleSceneReady(event) {
+    this.sceneReady = true;
+    this.clearStartupFallbackTimer();
+
+    const details = event && event.detail ? event.detail : null;
+    if (details && details.degraded && !this.isStarted) {
+      this.enableManualStart("Safe mode active: some optional features are off.");
+    }
+
+    console.log("Scene is ready!");
+  }
+
+  enableManualStart(
+    noticeMessage,
+    loadingStateText = "Ready",
+    loadingStateColor = "#ffffff",
+  ) {
+    if (this.startButton) {
+      this.startButton.classList.remove("hidden");
+      this.startButton.classList.add("visible");
+    }
+
+    const progress = document.getElementById("loading-progress");
+    if (progress) {
+      const currentWidth = Number.parseFloat(progress.style.width || "0");
+      if (currentWidth < 95) {
+        progress.style.width = "95%";
+      }
+    }
+
+    const loadingText = document.querySelector(".loading-text");
+    if (loadingText && !this.isStarted) {
+      loadingText.textContent = loadingStateText;
+      loadingText.style.color = loadingStateColor;
+    }
+
+    const notice = document.querySelector(".desktop-notice");
+    if (notice && noticeMessage) {
+      notice.textContent = noticeMessage;
+      notice.style.color = "#ffb86c";
+    }
   }
 
   startWebsite() {
     if (this.isStarted) return;
     this.isStarted = true;
+    this.clearStartupFallbackTimer();
 
     console.log("Starting website...");
 
@@ -78,6 +159,10 @@ export class AppManager {
     this.showScene();
 
     this.startIntroSequence();
+
+    if (this.guideManager) {
+      this.guideManager.show();
+    }
   }
 
   hideLoading() {
@@ -113,6 +198,8 @@ export class AppManager {
   typeText() {
     const text = "objz@portfolio";
     if (!this.typedElement) return;
+
+    this.typedElement.textContent = "";
 
     let i = 0;
     this.typingInterval = setInterval(() => {
@@ -175,9 +262,17 @@ export class AppManager {
       txt.textContent = "Failed to load application";
       txt.style.color = "#ff5555";
     }
+
+    this.enableManualStart(
+      "Safe mode: initialization failed. You can still start.",
+      "Failed to load application",
+      "#ff5555",
+    );
   }
 
   dispose() {
+    this.clearStartupFallbackTimer();
+
     if (this.typingInterval) {
       clearInterval(this.typingInterval);
       this.typingInterval = null;
@@ -186,6 +281,11 @@ export class AppManager {
     if (this.sceneManager) {
       this.sceneManager.dispose();
       this.sceneManager = null;
+    }
+
+    if (this.guideManager) {
+      this.guideManager.dispose();
+      this.guideManager = null;
     }
   }
 }

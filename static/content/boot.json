@@ -1,0 +1,77 @@
+{
+  "bootMessages": [
+    "Loading Linux kernel version 6.8.9-wasm1-1...",
+    "Loading initial ramdisk (initramfs)...",
+    "Starting systemd-udevd v254.5-1...",
+    "Probing hardware...",
+    "Detected storage device: /dev/nvme0n1",
+    "Detected storage device: /dev/sda",
+    "Activating swap on /dev/sda2...",
+    "Mounting root filesystem...",
+    "Checking file system on /dev/sda1...",
+    "Mounting /boot...",
+    "Mounting /home...",
+    "Mounting /var...",
+    "Starting systemd-journald.service...",
+    "Starting systemd-tmpfiles-setup-dev.service...",
+    "Starting systemd-sysctl.service...",
+    "Starting Load Kernel Modules...",
+    "Loading kernel modules: i915 ext4 fuse...",
+    "Starting Network Manager...",
+    "Starting Login Service (systemd-logind)...",
+    "Starting Authorization Manager (polkitd)...",
+    "Starting User Manager for UID 1000...",
+    "Starting Interface..."
+  ],
+  "logoLines": [
+    "             .           ",
+    "             7:          ",
+    "           .7J^          ",
+    "         .~?JJ:          ",
+    "       :!?JJJ~           ",
+    "     ^7JJJJ7:            ",
+    "   :7JJJJ7:   .^         ",
+    "  :?J?J?:     :J7.       ",
+    "  ~J?J?.      !JJ!       ",
+    "  .7JJ!     .7J?J?       ",
+    "    :~7:  .~?J?J?^       ",
+    "        .~?JJJ?!:        ",
+    "       :?JJJ?!:          ",
+    "      .?JJ7^.            ",
+    "      :JJ~               ",
+    "       7!                ",
+    "       `                 "
+  ],
+  "loginMessages": [
+    {
+      "text": "WASM Linux 6.8.9 (tty1)",
+      "color": "green"
+    },
+    {
+      "text": ""
+    },
+    {
+      "text": "login: objz",
+      "typingDelayMs": 50
+    },
+    {
+      "text": "password: ",
+      "typingDelayMs": 50,
+      "maskedSuffix": "********"
+    },
+    {
+      "text": ""
+    },
+    {
+      "text": "Last login: Mon May 27 13:59:36 2025",
+      "color": "white"
+    },
+    {
+      "text": "Type 'help' for further information",
+      "color": "yellow"
+    },
+    {
+      "text": ""
+    }
+  ]
+}

@@ -16,9 +16,13 @@ export class SceneManager {
     this.frameInterval = 1000 / this.frameTarget;
     this.lastFrame = 0;
     this.animationId = null;
+    this.textureUpdateRateMs = this.performanceMode ? 33 : 16;
+    this.lastTextureUpdate = 0;
 
     this.crtSettings = this.getCrtSettings();
-    this.scenePosition = { x: 0, y: 0, z: 0 };
+    this.startupState = "booting";
+    this.startupIssues = [];
+    this.isDegraded = false;
 
     this.scene = null;
     this.camera = null;
@@ -33,10 +37,6 @@ export class SceneManager {
     this.introComplete = false;
     this.everUnfocused = false;
 
-    this.scrollHistory = [];
-    this.maxScroll = this.performanceMode ? 25 : 50;
-    this.scrollPosition = 0;
-
     this.modelManager = null;
     this.effectsManager = null;
     this.shaderManager = null;
@@ -45,12 +45,6 @@ export class SceneManager {
     this.audioManager = null;
     this.eventManager = null;
     this.performanceManager = null;
-
-    this.raycaster = null;
-    this.mouse = null;
-
-    this.defaultCamera = new THREE.Vector3(4, 5, 10);
-    this.defaultTarget = new THREE.Vector3(0, 1.5, 0);
 
     this.init();
   }
@@ -77,18 +71,20 @@ export class SceneManager {
   }
 
   getCrtSettings() {
+    const lowPower = this.performanceMode;
+
     return {
-      bulge: 0.9,
-      scanlineIntensity: 0.02,
-      scanlineCount: 640,
-      vignetteIntensity: 0.3,
-      vignetteRadius: 0.26,
-      glowIntensity: 0.005,
+      bulge: lowPower ? 0.6 : 0.75,
+      scanlineIntensity: lowPower ? 0.013 : 0.018,
+      scanlineCount: lowPower ? 520 : 620,
+      vignetteIntensity: lowPower ? 0.2 : 0.26,
+      vignetteRadius: 0.28,
+      glowIntensity: lowPower ? 0.003 : 0.0045,
       glowColor: new THREE.Vector3(0, 0.01, 0.01),
-      brightness: 0.85,
-      contrast: 1.05,
-      offsetX: 0.54,
-      offsetY: 0.7,
+      brightness: lowPower ? 0.9 : 0.87,
+      contrast: lowPower ? 1.02 : 1.05,
+      offsetX: 0.0,
+      offsetY: 0.0,
     };
   }
 
@@ -97,8 +93,12 @@ export class SceneManager {
       this.updateProgress(5);
 
       this.audioManager = new AudioManager();
-      await this.audioManager.init();
-      this.updateProgress(10);
+      await this.executeStep(
+        "Audio initialization",
+        () => this.audioManager.init(),
+        { timeoutMs: 3500, optional: true },
+      );
+      this.updateProgress(12);
 
       this.createScene();
       this.createCamera();
@@ -117,7 +117,10 @@ export class SceneManager {
         this.performanceMode,
       );
 
-      await this.modelManager.loadModel();
+      await this.executeStep("Model load", () => this.modelManager.loadModel(), {
+        timeoutMs: 12000,
+        optional: true,
+      });
       this.updateProgress(60);
 
       this.mouseManager = new MouseManager(
@@ -126,14 +129,22 @@ export class SceneManager {
         this.modelManager,
         this.performanceMode,
       );
-      await this.setupTexture();
+
+      await this.executeStep("Terminal texture setup", () => this.setupTexture(), {
+        timeoutMs: 4000,
+        optional: true,
+      });
       this.updateProgress(80);
 
       this.eventManager = new EventManager(this);
       this.eventManager.setup();
 
       if (!this.performanceMode) {
-        await this.effectsManager.setupPostProcessing();
+        await this.executeStep(
+          "Post-processing setup",
+          () => this.effectsManager.setupPostProcessing(),
+          { timeoutMs: 4500, optional: true },
+        );
       }
 
       this.animationManager = new AnimationManager(
@@ -146,21 +157,112 @@ export class SceneManager {
         this.performanceManager = new PerformanceManager(this);
         this.performanceManager.start();
       }
-
-      this.updateProgress(100);
-      this.showStartButton();
-      this.showTerminal();
-      this.animate();
-      window.dispatchEvent(new CustomEvent("sceneReady"));
-    } catch (e) {
-      console.error("Scene init failed:", e);
-      this.showError();
+    } catch (error) {
+      this.recordStartupIssue("Scene bootstrap", error);
+      this.startupState = "error";
+      this.showError("Failed to initialize full 3D mode. Safe mode available.");
+    } finally {
+      this.finalizeStartup();
     }
+  }
+
+  async executeStep(label, fn, options = {}) {
+    const { timeoutMs = 5000, optional = false } = options;
+
+    try {
+      return await this.withTimeout(
+        Promise.resolve().then(() => fn()),
+        timeoutMs,
+        `${label} timed out after ${timeoutMs}ms`,
+      );
+    } catch (error) {
+      this.recordStartupIssue(label, error);
+
+      if (!optional) {
+        throw error;
+      }
+
+      this.isDegraded = true;
+      if (this.startupState !== "error") {
+        this.startupState = "degraded";
+      }
+      this.setLoadingNotice("Safe mode: optional systems were skipped.", true);
+      return null;
+    }
+  }
+
+  withTimeout(promise, timeoutMs, timeoutMessage) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const finish = (handler, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timerId);
+        handler(value);
+      };
+
+      const timerId = window.setTimeout(() => {
+        finish(reject, new Error(timeoutMessage));
+      }, timeoutMs);
+
+      Promise.resolve(promise)
+        .then((value) => finish(resolve, value))
+        .catch((error) => finish(reject, error));
+    });
+  }
+
+  recordStartupIssue(label, error) {
+    const message =
+      error instanceof Error ? error.message : String(error || "Unknown error");
+    const entry = `${label}: ${message}`;
+    this.startupIssues.push(entry);
+    console.warn(`[Startup] ${entry}`);
+  }
+
+  setLoadingNotice(text, isWarning = false) {
+    const notice = document.querySelector(".desktop-notice");
+    if (!notice) return;
+
+    notice.textContent = text;
+    notice.style.color = isWarning ? "#ffb86c" : "#8be9fd";
+  }
+
+  finalizeStartup() {
+    this.updateProgress(100);
+    this.showStartButton();
+    this.showTerminal();
+
+    if (this.renderer && !this.animationId) {
+      this.animate();
+    }
+
+    if (this.startupIssues.length > 0) {
+      this.isDegraded = true;
+      if (this.startupState !== "error") {
+        this.startupState = "degraded";
+      }
+      this.setLoadingNotice("Safe mode active - some features were disabled.", true);
+    } else if (this.startupState !== "error") {
+      this.startupState = "ready";
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("sceneReady", {
+        detail: {
+          state: this.startupState,
+          degraded: this.isDegraded,
+          issues: this.startupIssues.slice(),
+          performanceMode: this.performanceMode,
+        },
+      }),
+    );
   }
 
   createScene() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0a0a0a);
+    this.scene.background = null;
+    this.scene.fog = new THREE.FogExp2(0x14212c, this.performanceMode ? 0.028 : 0.02);
   }
 
   createCamera() {
@@ -305,17 +407,7 @@ export class SceneManager {
 
     this.terminalTexture.offset.y = 0.0;
     this.terminalTexture.repeat.y = 1.0;
-
-    const updateInterval = this.performanceMode ? 33 : 16;
-    setInterval(() => {
-      try {
-        if (this.terminalTexture) {
-          this.terminalTexture.needsUpdate = true;
-        }
-      } catch (e) {
-        console.warn("Texture update failed:", e);
-      }
-    }, updateInterval);
+    this.lastTextureUpdate = performance.now();
   }
 
   startIntro() {
@@ -323,6 +415,7 @@ export class SceneManager {
     window.dispatchEvent(
       new CustomEvent("terminalReady", { detail: { sceneManager: this } }),
     );
+    window.dispatchEvent(new CustomEvent("terminalFocus"));
 
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent("terminalFocus"));
@@ -332,8 +425,10 @@ export class SceneManager {
       }
     }, 15000);
 
-    this.audioManager.play("boot");
-    this.audioManager.play("fan");
+    if (this.audioManager) {
+      this.audioManager.play("boot");
+      this.audioManager.play("fan");
+    }
 
     if (this.animationManager) {
       this.animationManager.startupAnimation();
@@ -342,26 +437,24 @@ export class SceneManager {
 
   updateProgress(p) {
     const bar = document.getElementById("loading-progress");
-    if (bar) bar.style.width = p + "%";
+    if (!bar) return;
+
+    const clampedProgress = Math.max(0, Math.min(100, Math.round(p)));
+    bar.style.width = `${clampedProgress}%`;
   }
 
   showStartButton() {
     const startButton = document.getElementById("start-btn");
+    if (!startButton) return;
+
     startButton.classList.remove("hidden");
     startButton.classList.add("visible");
   }
 
-  hideLoading() {
-    setTimeout(() => {
-      const loading = document.getElementById("loading");
-      if (loading) loading.classList.add("hidden");
-    }, 500);
-  }
-
-  showError() {
+  showError(message = "Failed to load") {
     const txt = document.querySelector(".loading-text");
     if (txt) {
-      txt.textContent = "Failed to load";
+      txt.textContent = message;
       txt.style.color = "#ff5555";
     }
   }
@@ -382,27 +475,40 @@ export class SceneManager {
   }
 
   animate() {
-    const now = Date.now();
+    const now = performance.now();
+    const screenMesh = this.modelManager ? this.modelManager.screenMesh : null;
 
     if (now - this.lastFrame < this.frameInterval) {
       this.animationId = requestAnimationFrame(() => this.animate());
       return;
     }
 
+    const deltaMs = this.lastFrame > 0 ? now - this.lastFrame : this.frameInterval;
+    const deltaSeconds = Math.min(0.05, deltaMs / 1000);
+
     this.lastFrame = now;
     this.animationId = requestAnimationFrame(() => this.animate());
 
     if (this.controls) this.controls.update();
     if (this.shaderManager)
-      this.shaderManager.updateTime(now * 0.001, this.modelManager.screenMesh);
+      this.shaderManager.updateTime(now * 0.001, screenMesh);
+
+    if (
+      this.terminalTexture &&
+      now - this.lastTextureUpdate >= this.textureUpdateRateMs
+    ) {
+      this.terminalTexture.needsUpdate = true;
+      this.lastTextureUpdate = now;
+    }
+
     if (this.animationManager) {
-      this.animationManager.updateIdleRotation(this.terminalFocused);
+      this.animationManager.updateIdleRotation(this.terminalFocused, deltaSeconds);
       this.animationManager.checkCameraBounds();
     }
     if (this.mouseManager) this.mouseManager.update();
     if (this.modelManager) this.modelManager.updateFadeIn();
     if (this.effectsManager) {
-      this.effectsManager.updateBloom(this.modelManager.screenMesh);
+      this.effectsManager.updateBloom(screenMesh);
       this.effectsManager.render();
     }
     if (this.performanceManager) this.performanceManager.updateFrame();
@@ -411,6 +517,8 @@ export class SceneManager {
   dispose() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.renderer) this.renderer.dispose();
+    if (this.eventManager) this.eventManager.dispose();
+    if (this.audioManager) this.audioManager.dispose();
     if (this.effectsManager) this.effectsManager.dispose();
     if (this.terminalTexture) this.terminalTexture.dispose();
     if (this.shaderManager) this.shaderManager.dispose();
