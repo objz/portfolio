@@ -23,6 +23,7 @@ export class SceneManager {
     this.startupState = "booting";
     this.startupIssues = [];
     this.isDegraded = false;
+    this.modelLoaded = false;
 
     this.scene = null;
     this.camera = null;
@@ -117,10 +118,7 @@ export class SceneManager {
         this.performanceMode,
       );
 
-      await this.executeStep("Model load", () => this.modelManager.loadModel(), {
-        timeoutMs: 12000,
-        optional: true,
-      });
+      this.modelLoaded = await this.loadModelWithRetry();
       this.updateProgress(60);
 
       this.mouseManager = new MouseManager(
@@ -160,7 +158,7 @@ export class SceneManager {
     } catch (error) {
       this.recordStartupIssue("Scene bootstrap", error);
       this.startupState = "error";
-      this.showError("Failed to initialize full 3D mode. Safe mode available.");
+      this.showError("Failed to initialize 3D scene. Please refresh the page.");
     } finally {
       this.finalizeStartup();
     }
@@ -186,9 +184,41 @@ export class SceneManager {
       if (this.startupState !== "error") {
         this.startupState = "degraded";
       }
-      this.setLoadingNotice("Safe mode: optional systems were skipped.", true);
       return null;
     }
+  }
+
+  async loadModelWithRetry() {
+    const attempts = [
+      { timeoutMs: 20000, label: "Model load" },
+      { timeoutMs: 35000, label: "Model load (retry 1)" },
+      { timeoutMs: 50000, label: "Model load (retry 2)" },
+    ];
+
+    for (let i = 0; i < attempts.length; i++) {
+      const { timeoutMs, label } = attempts[i];
+
+      try {
+        await this.withTimeout(
+          Promise.resolve().then(() => this.modelManager.loadModel()),
+          timeoutMs,
+          `${label} timed out after ${timeoutMs}ms`,
+        );
+        return true;
+      } catch (error) {
+        this.recordStartupIssue(label, error);
+
+        if (i < attempts.length - 1) {
+          console.warn(`${label} failed, retrying...`);
+          this.setLoadingNotice(
+            `Loading took too long, retrying (${i + 2}/${attempts.length})...`,
+            true,
+          );
+        }
+      }
+    }
+
+    return false;
   }
 
   withTimeout(promise, timeoutMs, timeoutMessage) {
@@ -230,21 +260,27 @@ export class SceneManager {
 
   finalizeStartup() {
     this.updateProgress(100);
-    this.showStartButton();
     this.showTerminal();
 
     if (this.renderer && !this.animationId) {
       this.animate();
     }
 
-    if (this.startupIssues.length > 0) {
+    if (!this.modelLoaded) {
+      this.startupState = "error";
+      this.isDegraded = true;
+      this.showError("Failed to load 3D model. Please refresh the page.");
+    } else if (this.startupIssues.length > 0) {
       this.isDegraded = true;
       if (this.startupState !== "error") {
         this.startupState = "degraded";
       }
-      this.setLoadingNotice("Safe mode active - some features were disabled.", true);
-    } else if (this.startupState !== "error") {
-      this.startupState = "ready";
+      this.showStartButton();
+    } else {
+      if (this.startupState !== "error") {
+        this.startupState = "ready";
+      }
+      this.showStartButton();
     }
 
     window.dispatchEvent(
@@ -252,6 +288,7 @@ export class SceneManager {
         detail: {
           state: this.startupState,
           degraded: this.isDegraded,
+          modelLoaded: this.modelLoaded,
           issues: this.startupIssues.slice(),
           performanceMode: this.performanceMode,
         },

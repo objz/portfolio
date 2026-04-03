@@ -87,10 +87,12 @@ export class AppManager {
         return;
       }
 
-      this.enableManualStart(
-        "Safe mode: startup took too long. You can start now.",
-      );
-    }, 12000);
+      const notice = document.querySelector(".desktop-notice");
+      if (notice) {
+        notice.textContent = "Loading is taking longer than expected...";
+        notice.style.color = "#ffb86c";
+      }
+    }, 15000);
   }
 
   clearStartupFallbackTimer() {
@@ -107,8 +109,14 @@ export class AppManager {
     this.clearStartupFallbackTimer();
 
     const details = event && event.detail ? event.detail : null;
-    if (details && details.degraded && !this.isStarted) {
-      this.enableManualStart("Safe mode active: some optional features are off.");
+
+    if (details && !details.modelLoaded && !this.isStarted) {
+      this.showFatalError("Failed to load. Please try refreshing the page.");
+      return;
+    }
+
+    if (!this.isStarted) {
+      this.enableManualStart();
     }
 
     console.log("Scene is ready!");
@@ -256,18 +264,26 @@ export class AppManager {
     }
   }
 
-  showError() {
+  showFatalError(message) {
     const txt = document.querySelector(".loading-text");
     if (txt) {
-      txt.textContent = "Failed to load application";
+      txt.textContent = message;
       txt.style.color = "#ff5555";
     }
 
-    this.enableManualStart(
-      "Safe mode: initialization failed. You can still start.",
-      "Failed to load application",
-      "#ff5555",
-    );
+    if (this.startButton) {
+      this.startButton.classList.remove("visible");
+      this.startButton.classList.add("hidden");
+    }
+
+    const notice = document.querySelector(".desktop-notice");
+    if (notice) {
+      notice.textContent = "";
+    }
+  }
+
+  showError() {
+    this.showFatalError("Failed to load application. Please refresh the page.");
   }
 
   dispose() {
