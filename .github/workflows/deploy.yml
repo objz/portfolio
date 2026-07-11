@@ -36,6 +36,9 @@ jobs:
       - name: Build static site
         run: ./build.sh
 
+      - name: Copy .well-known
+        run: cp -r static/.well-known dist/.well-known
+
       - name: List dist contents (debug)
         run: ls -lR dist
 
